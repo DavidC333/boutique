@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админ-панель · Boutique</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#f7f3ee; --dark:#1a1410; --gold:#b8935a; --gold-light:#d4aa72; --muted:#8a7968; --border:#e2d9ce; --card:#fff; --green:#2e7d4f; --green-light:#e8f5ee; --red:#c44b3a; --red-light:#fdf0ee; --yellow:#c48a1a; --yellow-light:#fdf6e3; --gray:#888; --gray-light:#f0f0f0; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--dark); font-family:'DM Sans',sans-serif; font-weight:300; min-height:100vh; }
+  header { background:var(--dark); padding:20px 32px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  .h-title { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:300; color:#f7f3ee; letter-spacing:0.08em; }
+  .h-sub { font-size:11px; color:var(--gold); letter-spacing:0.2em; text-transform:uppercase; margin-top:3px; }
+  .tabs { background:var(--card); border-bottom:1px solid var(--border); display:flex; padding:0 32px; overflow-x:auto; }
+  .tab { padding:14px 20px; font-size:13px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s; white-space:nowrap; }
+  .tab.active { color:var(--dark); border-bottom-color:var(--gold); font-weight:500; }
+  .tab-badge { display:inline-flex; align-items:center; justify-content:center; background:var(--red); color:#fff; font-size:10px; border-radius:50%; width:17px; height:17px; margin-left:6px; }
+  main { max-width:960px; margin:0 auto; padding:32px 24px 80px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:32px; }
+  .stat-card { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:16px 20px; }
+  .stat-num { font-family:'Cormorant Garamond',serif; font-size:32px; font-weight:400; }
+  .stat-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-top:4px; }
+  .section { display:none; }
+  .section.active { display:block; }
+  .order-card { background:var(--card); border:1px solid var(--border); border-radius:4px; margin-bottom:12px; overflow:hidden; }
+  .order-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; gap:12px; flex-wrap:wrap; }
+  .order-id { font-size:12px; font-weight:500; color:var(--muted); letter-spacing:0.05em; }
+  .order-ts { font-size:11px; color:var(--muted); }
+  .order-total { font-family:'Cormorant Garamond',serif; font-size:20px; color:var(--gold); }
+  .status-badge { font-size:10px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; padding:3px 10px; border-radius:20px; }
+  .status-pending { background:var(--yellow-light); color:var(--yellow); }
+  .status-confirmed { background:var(--green-light); color:var(--green); }
+  .status-rejected { background:var(--red-light); color:var(--red); }
+  .order-items { padding:0 18px 14px; }
+  .order-item-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid var(--border); font-size:13px; gap:8px; }
+  .order-item-sku { font-size:10px; color:var(--muted); letter-spacing:0.1em; background:#f7f3ee; padding:2px 6px; border-radius:2px; white-space:nowrap; }
+  .order-item-name { flex:1; }
+  .order-item-price { color:var(--gold); white-space:nowrap; }
+  .order-actions { padding:12px 18px; background:#fafaf8; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap; }
+  .btn { padding:8px 18px; border:none; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; letter-spacing:0.05em; cursor:pointer; border-radius:2px; transition:opacity 0.15s; }
+  .btn-accept { background:var(--green); color:#fff; }
+  .btn-reject { background:var(--red); color:#fff; }
+  .btn-undo { background:var(--gray-light); color:var(--gray); }
+  .btn:hover { opacity:0.82; }
+  .empty-state { text-align:center; color:var(--muted); padding:60px 0; font-size:14px; }
+  .empty-state .icon { font-size:40px; margin-bottom:12px; }
+
+  /* ADD PRODUCT FORM */
+  .add-product-section { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:24px; margin-bottom:24px; }
+  .add-product-section h3 { font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:400; margin-bottom:16px; }
+  .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:11px; color:var(--muted); letter-spacing:0.08em; text-transform:uppercase; }
+  .form-field input, .form-field select { padding:8px 10px; border:1px solid var(--border); border-radius:2px; font-family:'DM Sans',sans-serif; font-size:13px; background:var(--bg); color:var(--dark); }
+  .form-field input:focus, .form-field select:focus { outline:none; border-color:var(--gold); }
+  .btn-add-product { margin-top:16px; padding:10px 24px; background:var(--dark); color:var(--card); border:none; font-family:'DM Sans',sans-serif; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; border-radius:2px; }
+  .btn-add-product:hover { background:var(--gold); }
+
+  /* INVENTORY */
+  .inv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  .inv-card { background:var(--card); border:1px solid var(--border); border-radius:4px; padding:14px 16px; display:flex; align-items:center; gap:12px; }
+  .inv-emoji { font-size:28px; flex-shrink:0; }
+  .inv-info { flex:1; min-width:0; }
+  .inv-sku { font-size:10px; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; }
+  .inv-name { font-size:13px; font-weight:400; line-height:1.3; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .inv-price { font-family:'Cormorant Garamond',serif; font-size:16px; color:var(--gold); margin-top:2px; }
+  .toggle-btn { flex-shrink:0; width:36px; height:20px; border-radius:10px; border:none; cursor:pointer; position:relative; transition:background 0.2s; }
+  .toggle-btn.on { background:var(--green); }
+  .toggle-btn.off { background:#ccc; }
+  .toggle-btn::after { content:''; position:absolute; top:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left 0.2s; }
+  .toggle-btn.on::after { left:18px; }
+  .toggle-btn.off::after { left:2px; }
+  .inv-card.is-sold { opacity:0.55; }
+  .inv-card.is-sold .inv-name { text-decoration:line-through; }
+  .inv-delete { background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; margin-left:4px; flex-shrink:0; }
+  .inv-delete:hover { color:var(--red); }
+
+  .loading-screen { text-align:center; padding:40px; color:var(--muted); }
+  .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--gold); border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 12px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  @media(max-width:600px) { header{padding:16px;} .tabs{padding:0 16px;} main{padding:20px 14px 60px;} }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="h-title">Панель управления</div>
+    <div class="h-sub">Boutique Sale · Admin</div>
+  </div>
+</header>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('orders')" id="tab-orders">Заказы <span class="tab-badge" id="pendingBadge" style="display:none">0</span></div>
+  <div class="tab" onclick="switchTab('inventory')" id="tab-inventory">Товары</div>
+</div>
+<main>
+  <div class="stats">
+    <div class="stat-card"><div class="stat-num" id="s-pending">—</div><div class="stat-label">Ожидают</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-confirmed">—</div><div class="stat-label">Принято</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-sold">—</div><div class="stat-label">Продано</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-available">—</div><div class="stat-label">В наличии</div></div>
+  </div>
+  <div class="section active" id="section-orders">
+    <div class="loading-screen"><div class="spinner"></div><p>Загрузка...</p></div>
+  </div>
+  <div class="section" id="section-inventory">
+    <div class="add-product-section">
+      <h3>Добавить товар</h3>
+      <div class="form-grid">
+        <div class="form-field"><label>Артикул</label><input id="f-id" placeholder="W-06"></div>
+        <div class="form-field"><label>Категория</label>
+          <select id="f-cat">
+            <option value="wallets">Кошельки и сумки</option>
+            <option value="perfume">Духи и красота</option>
+            <option value="accessories">Аксессуары</option>
+            <option value="other">Другое</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Эмодзи</label><input id="f-emoji" placeholder="👛" maxlength="2"></div>
+        <div class="form-field"><label>Цена (₾)</label><input id="f-price" type="number" placeholder="35"></div>
+        <div class="form-field"><label>Название (RU)</label><input id="f-name-ru" placeholder="Кошелёк кожаный"></div>
+        <div class="form-field"><label>Название (EN)</label><input id="f-name-en" placeholder="Leather wallet"></div>
+        <div class="form-field"><label>Название (GE)</label><input id="f-name-ge" placeholder="ტყავის საფულე"></div>
+        <div class="form-field"><label>Описание (RU)</label><input id="f-desc-ru" placeholder="Краткое описание"></div>
+      </div>
+      <button class="btn-add-product" onclick="addProduct()">+ Добавить товар</button>
+    </div>
+    <div class="inv-grid" id="inventoryGrid"><div class="loading-screen"><div class="spinner"></div></div></div>
+  </div>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDsr51JFbm2HxwhorkUHnfVWOXRr5r4iy0",
+  authDomain: "boutique-sale-2b5db.firebaseapp.com",
+  projectId: "boutique-sale-2b5db",
+  storageBucket: "boutique-sale-2b5db.firebasestorage.app",
+  messagingSenderId: "227697473974",
+  appId: "1:227697473974:web:56c7167a2e81648d05a917"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let orders = [], products = [];
+
+// ── TABS ──────────────────────────────────────────────
+window.switchTab = name => {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('section-'+name).classList.add('active');
+};
+
+// ── REALTIME: ORDERS ──────────────────────────────────
+onSnapshot(collection(db,"orders"), snap => {
+  orders = snap.docs.map(d=>({_id:d.id,...d.data()}));
+  renderOrders();
+  renderStats();
+});
+
+// ── REALTIME: PRODUCTS ────────────────────────────────
+onSnapshot(collection(db,"products"), snap => {
+  products = snap.docs.map(d=>({_id:d.id,...d.data()}));
+  renderInventory();
+  renderStats();
+});
+
+// ── ORDERS ────────────────────────────────────────────
+window.confirmOrder = async (firestoreId, items) => {
+  await updateDoc(doc(db,"orders",firestoreId),{status:'confirmed'});
+  for (const item of items) {
+    const p = products.find(x=>x.id===item.id);
+    if (p) await updateDoc(doc(db,"products",p._id),{sold:true});
+  }
+};
+window.rejectOrder = async firestoreId => { await updateDoc(doc(db,"orders",firestoreId),{status:'rejected'}); };
+window.undoOrder = async (firestoreId, status, items) => {
+  if (status==='confirmed') {
+    for (const item of items) {
+      const p = products.find(x=>x.id===item.id);
+      if (p) await updateDoc(doc(db,"products",p._id),{sold:false});
+    }
+  }
+  await updateDoc(doc(db,"orders",firestoreId),{status:'pending'});
+};
+
+function fmtTime(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString('ru-RU')+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderOrders() {
+  const el = document.getElementById('section-orders');
+  if (!orders.length) { el.innerHTML='<div class="empty-state"><div class="icon">📭</div>Заказов пока нет</div>'; return; }
+  const sorted = [...orders].sort((a,b)=>{
+    if (a.status==='pending'&&b.status!=='pending') return -1;
+    if (b.status==='pending'&&a.status!=='pending') return 1;
+    const ta = a.createdAt?.toDate?.()?.getTime()||0, tb = b.createdAt?.toDate?.()?.getTime()||0;
+    return tb-ta;
+  });
+  const labels = {pending:'Ожидает',confirmed:'Принято',rejected:'Отклонено'};
+  el.innerHTML = sorted.map(o => {
+    const itemsHtml = (o.items||[]).map(i=>`<div class="order-item-row"><span class="order-item-sku">${i.id}</span><span class="order-item-name">${i.name}</span><span style="color:var(--muted);font-size:12px">×${i.qty}</span><span class="order-item-price">₾${i.price*i.qty}</span></div>`).join('');
+    const itemsJson = encodeURIComponent(JSON.stringify(o.items||[]));
+    const actions = o.status==='pending'
+      ? `<button class="btn btn-accept" onclick="confirmOrder('${o._id}',JSON.parse(decodeURIComponent('${itemsJson}')))">✅ Принять</button><button class="btn btn-reject" onclick="rejectOrder('${o._id}')">❌ Отклонить</button>`
+      : `<button class="btn btn-undo" onclick="undoOrder('${o._id}','${o.status}',JSON.parse(decodeURIComponent('${itemsJson}')))">↩ Отменить</button>`;
+    return `<div class="order-card">
+      <div class="order-header"><div><div class="order-id">${o.orderId||o._id}</div><div class="order-ts">${fmtTime(o.createdAt)}</div></div><span class="status-badge status-${o.status}">${labels[o.status]||o.status}</span><div class="order-total">₾${o.total}</div></div>
+      <div class="order-items">${itemsHtml}</div>
+      <div class="order-actions">${actions}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── INVENTORY ─────────────────────────────────────────
+window.toggleSold = async (firestoreId, currentSold) => { await updateDoc(doc(db,"products",firestoreId),{sold:!currentSold}); };
+window.deleteProduct = async (firestoreId, name) => { if(confirm(`Удалить "${name}"?`)) await deleteDoc(doc(db,"products",firestoreId)); };
+
+function renderInventory() {
+  const grid = document.getElementById('inventoryGrid');
+  if (!products.length) { grid.innerHTML='<div class="empty-state"><div class="icon">📦</div>Товаров нет. Добавьте первый!</div>'; return; }
+  grid.innerHTML = products.map(p=>`<div class="inv-card${p.sold?' is-sold':''}">
+    <div class="inv-emoji">${p.emoji||'🛍️'}</div>
+    <div class="inv-info"><div class="inv-sku">${p.id}</div><div class="inv-name">${p.name?.ru||''}</div><div class="inv-price">₾${p.price}</div></div>
+    <button class="toggle-btn ${p.sold?'off':'on'}" onclick="toggleSold('${p._id}',${!!p.sold})" title="${p.sold?'Вернуть в продажу':'Пометить как продано'}"></button>
+    <button class="inv-delete" onclick="deleteProduct('${p._id}','${(p.name?.ru||'').replace(/'/g,"\\'")}')">🗑</button>
+  </div>`).join('');
+}
+
+// ── STATS ─────────────────────────────────────────────
+function renderStats() {
+  const pending = orders.filter(o=>o.status==='pending').length;
+  const confirmed = orders.filter(o=>o.status==='confirmed').length;
+  const sold = products.filter(p=>p.sold).length;
+  document.getElementById('s-pending').textContent = pending;
+  document.getElementById('s-confirmed').textContent = confirmed;
+  document.getElementById('s-sold').textContent = sold;
+  document.getElementById('s-available').textContent = products.length - sold;
+  const badge = document.getElementById('pendingBadge');
+  badge.textContent = pending; badge.style.display = pending>0?'inline-flex':'none';
+}
+
+// ── ADD PRODUCT ───────────────────────────────────────
+window.addProduct = async () => {
+  const id = document.getElementById('f-id').value.trim();
+  const cat = document.getElementById('f-cat').value;
+  const emoji = document.getElementById('f-emoji').value.trim()||'🛍️';
+  const price = parseFloat(document.getElementById('f-price').value);
+  const nameRu = document.getElementById('f-name-ru').value.trim();
+  const nameEn = document.getElementById('f-name-en').value.trim();
+  const nameGe = document.getElementById('f-name-ge').value.trim();
+  const descRu = document.getElementById('f-desc-ru').value.trim();
+  if (!id||!nameRu||!price) { alert('Заполни артикул, название и цену!'); return; }
+  if (products.find(p=>p.id===id)) { alert(`Артикул ${id} уже существует!`); return; }
+  await addDoc(collection(db,"products"),{ id, cat, emoji, price, sold:false, name:{ru:nameRu,en:nameEn,ge:nameGe}, desc:{ru:descRu,en:'',ge:''}, createdAt:serverTimestamp() });
+  ['f-id','f-emoji','f-price','f-name-ru','f-name-en','f-name-ge','f-desc-ru'].forEach(id=>{ document.getElementById(id).value=''; });
+  alert(`Товар ${id} добавлен!`);
+};
+</script>
+</body>
+</html>
