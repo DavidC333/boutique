@@ -73,8 +73,21 @@
   .toggle-btn.off::after { left:2px; }
   .inv-card.is-sold { opacity:0.55; }
   .inv-card.is-sold .inv-name { text-decoration:line-through; }
-  .inv-delete { background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; margin-left:4px; flex-shrink:0; }
+  .inv-edit { background:none; border:none; color:var(--muted); font-size:15px; cursor:pointer; flex-shrink:0; transition:color 0.15s; padding:0 2px; }
+  .inv-edit:hover { color:var(--gold); }
+  .inv-delete { background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; margin-left:2px; flex-shrink:0; transition:color 0.15s; }
   .inv-delete:hover { color:var(--red); }
+
+  /* EDIT MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:500; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.open { display:flex; }
+  .modal-box { background:var(--card); border-radius:6px; padding:28px 32px; width:min(580px,100%); max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+  .modal-title { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:400; margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .modal-actions { display:flex; gap:10px; margin-top:22px; justify-content:flex-end; }
+  .btn-modal-save { padding:10px 26px; background:var(--dark); color:var(--card); border:none; font-family:'DM Sans',sans-serif; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; border-radius:2px; transition:background 0.2s; }
+  .btn-modal-save:hover { background:var(--gold); }
+  .btn-modal-cancel { padding:10px 20px; background:none; border:1px solid var(--border); color:var(--muted); font-family:'DM Sans',sans-serif; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; border-radius:2px; transition:all 0.2s; }
+  .btn-modal-cancel:hover { border-color:var(--dark); color:var(--dark); }
   .inv-flags { display:flex; gap:3px; flex-shrink:0; font-size:15px; line-height:1; }
   .form-field.checkbox { flex-direction:row; align-items:center; gap:8px; padding-top:22px; }
   .form-field.checkbox label { font-size:12px; color:var(--dark); text-transform:none; letter-spacing:0; cursor:pointer; font-weight:400; }
@@ -286,6 +299,7 @@ function renderInventory() {
     <div class="inv-info"><div class="inv-sku">${p.id}</div><div class="inv-name">${p.name?.ru||''}</div><div class="inv-price">₾${p.price}</div></div>
     <div class="inv-flags">${p.isNew?'🆕':''}${p.isSale?'🏷️':''}</div>
     <button class="toggle-btn ${p.sold?'off':'on'}" onclick="toggleSold('${p._id}',${!!p.sold})" title="${p.sold?'Вернуть в продажу':'Пометить как продано'}"></button>
+    <button class="inv-edit" onclick="openEditModal('${p._id}')" title="Редактировать">✏️</button>
     <button class="inv-delete" onclick="deleteProduct('${p._id}','${(p.name?.ru||'').replace(/'/g,"\\'")}')">🗑</button>
   </div>`).join('');
 }
@@ -323,6 +337,77 @@ window.addProduct = async () => {
   document.getElementById('f-isSale').checked = false;
   alert(`Товар ${id} добавлен!`);
 };
+
+// ── EDIT PRODUCT ──────────────────────────────────────
+let editingId = null;
+
+window.openEditModal = firestoreId => {
+  const p = products.find(x => x._id === firestoreId);
+  if (!p) return;
+  editingId = firestoreId;
+  document.getElementById('e-id').value = p.id;
+  document.getElementById('e-cat').value = p.cat || 'other';
+  document.getElementById('e-emoji').value = p.emoji || '';
+  document.getElementById('e-price').value = p.price || '';
+  document.getElementById('e-name-ru').value = p.name?.ru || '';
+  document.getElementById('e-name-en').value = p.name?.en || '';
+  document.getElementById('e-name-ge').value = p.name?.ge || '';
+  document.getElementById('e-desc-ru').value = p.desc?.ru || '';
+  document.getElementById('e-isNew').checked = !!p.isNew;
+  document.getElementById('e-isSale').checked = !!p.isSale;
+  document.getElementById('editModal').classList.add('open');
+};
+
+window.closeEditModal = () => {
+  editingId = null;
+  document.getElementById('editModal').classList.remove('open');
+};
+
+window.saveProduct = async () => {
+  if (!editingId) return;
+  const price = parseFloat(document.getElementById('e-price').value);
+  const nameRu = document.getElementById('e-name-ru').value.trim();
+  if (!nameRu || !price) { alert('Заполни название и цену!'); return; }
+  await updateDoc(doc(db, 'products', editingId), {
+    cat: document.getElementById('e-cat').value,
+    emoji: document.getElementById('e-emoji').value.trim() || '🛍️',
+    price,
+    name: { ru: nameRu, en: document.getElementById('e-name-en').value.trim(), ge: document.getElementById('e-name-ge').value.trim() },
+    desc: { ru: document.getElementById('e-desc-ru').value.trim(), en: '', ge: '' },
+    isNew: document.getElementById('e-isNew').checked,
+    isSale: document.getElementById('e-isSale').checked,
+  });
+  closeEditModal();
+};
 </script>
+
+<div class="modal-overlay" id="editModal" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal-box">
+    <div class="modal-title">Редактировать товар</div>
+    <div class="form-grid">
+      <div class="form-field"><label>Артикул</label><input id="e-id" disabled style="opacity:0.55;cursor:default"></div>
+      <div class="form-field"><label>Категория</label>
+        <select id="e-cat">
+          <option value="wallets">Кошельки и сумки</option>
+          <option value="perfume">Духи и красота</option>
+          <option value="accessories">Аксессуары</option>
+          <option value="other">Другое</option>
+        </select>
+      </div>
+      <div class="form-field"><label>Эмодзи</label><input id="e-emoji" maxlength="2"></div>
+      <div class="form-field"><label>Цена (₾)</label><input id="e-price" type="number"></div>
+      <div class="form-field"><label>Название (RU)</label><input id="e-name-ru"></div>
+      <div class="form-field"><label>Название (EN)</label><input id="e-name-en"></div>
+      <div class="form-field"><label>Название (GE)</label><input id="e-name-ge"></div>
+      <div class="form-field"><label>Описание (RU)</label><input id="e-desc-ru"></div>
+      <div class="form-field checkbox"><input type="checkbox" id="e-isNew"><label for="e-isNew">🆕 Новинка</label></div>
+      <div class="form-field checkbox"><input type="checkbox" id="e-isSale"><label for="e-isSale">🏷️ Скидка</label></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeEditModal()">Отмена</button>
+      <button class="btn-modal-save" onclick="saveProduct()">Сохранить</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
