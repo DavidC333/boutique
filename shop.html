@@ -70,6 +70,10 @@
   .messenger-btn:hover { opacity:0.88; }
   .empty-cart { text-align:center; color:var(--muted); font-size:14px; padding:40px 0; }
   .empty-cart .big { font-size:40px; margin-bottom:12px; }
+  .cart-contacts { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .contact-input { width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:3px; font-family:'DM Sans',sans-serif; font-size:13px; background:var(--cream); color:var(--dark); outline:none; transition:border-color 0.2s; }
+  .contact-input:focus { border-color:var(--gold); }
+  .contact-input.error { border-color:var(--badge); }
   .order-sent { display:none; position:fixed; inset:0; background:rgba(26,20,16,0.92); z-index:300; align-items:center; justify-content:center; flex-direction:column; gap:16px; color:#fff; text-align:center; padding:32px; }
   .order-sent.show { display:flex; }
   .order-sent .big-check { font-size:64px; }
@@ -105,6 +109,10 @@
   <div class="cart-items-list" id="cartItemsList"></div>
   <div class="cart-total-block">
     <div class="cart-total-big"><span data-t="total"></span><span id="cartTotalVal">₾0</span></div>
+    <div class="cart-contacts">
+      <input class="contact-input" type="text" id="orderName" data-t-placeholder="namePlaceholder">
+      <input class="contact-input" type="tel" id="orderPhone" data-t-placeholder="phonePlaceholder">
+    </div>
     <button class="messenger-btn" onclick="sendOrder()" data-t="orderViaMessenger"></button>
   </div>
 </div>
@@ -133,9 +141,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const T = {
-  en: { storeName:"Boutique Clearance", storeSub:"Special sale · Everything must go", cartLabel:"Items in cart", viewCart:"View Order", yourOrder:"Your Order", total:"Total", orderViaMessenger:"📨 Send order via Messenger", footer:"Questions? Write us on Facebook Messenger", addToCart:"Add to cart", sold:"Sold out", emptyCart:"Your cart is empty", sentTitle:"Order sent!", sentDesc:"We'll confirm your order via Messenger shortly.", backToShop:"Continue shopping", cats:{wallets:"Wallets & Bags",perfume:"Perfume & Beauty",accessories:"Accessories",other:"Other"} },
-  ru: { storeName:"Распродажа", storeSub:"Специальная распродажа · Всё должно уйти", cartLabel:"Товаров в корзине", viewCart:"Смотреть заказ", yourOrder:"Ваш заказ", total:"Итого", orderViaMessenger:"📨 Отправить заказ через Messenger", footer:"Вопросы? Напишите нам в Facebook Messenger", addToCart:"В корзину", sold:"Продано", emptyCart:"Корзина пуста", sentTitle:"Заказ отправлен!", sentDesc:"Мы подтвердим ваш заказ в Messenger в ближайшее время.", backToShop:"Продолжить покупки", cats:{wallets:"Кошельки и сумки",perfume:"Духи и красота",accessories:"Аксессуары",other:"Другое"} },
-  ge: { storeName:"გაყიდვა", storeSub:"სპეციალური გაყიდვა · ყველაფერი უნდა გაიყიდოს", cartLabel:"პროდუქტი კალათაში", viewCart:"შეკვეთის ნახვა", yourOrder:"თქვენი შეკვეთა", total:"სულ", orderViaMessenger:"📨 შეკვეთის გაგზავნა Messenger-ით", footer:"კითხვები? დაგვიკავშირდით Facebook Messenger-ზე", addToCart:"კალათაში", sold:"გაყიდულია", emptyCart:"კალათა ცარიელია", sentTitle:"შეკვეთა გაიგზავნა!", sentDesc:"მალე დაგიდასტურებთ Messenger-ში.", backToShop:"გაგრძელება", cats:{wallets:"საფულეები და ჩანთები",perfume:"სუნამო და სილამაზე",accessories:"აქსესუარები",other:"სხვა"} }
+  en: { storeName:"Boutique Clearance", storeSub:"Special sale · Everything must go", cartLabel:"Items in cart", viewCart:"View Order", yourOrder:"Your Order", total:"Total", orderViaMessenger:"📨 Send order via Messenger", footer:"Questions? Write us on Facebook Messenger", addToCart:"Add to cart", sold:"Sold out", emptyCart:"Your cart is empty", sentTitle:"Order sent!", sentDesc:"We'll confirm your order via Messenger shortly.", backToShop:"Continue shopping", namePlaceholder:"Your name", phonePlaceholder:"Phone number", nameRequired:"Please enter your name", orderMsg:"Hello! I would like to order:\n\n{items}\n\nTotal: ₾{total}\n\nName: {name}\nPhone: {phone}\nOrder ID: {orderId}", cats:{wallets:"Wallets & Bags",perfume:"Perfume & Beauty",accessories:"Accessories",other:"Other"} },
+  ru: { storeName:"Распродажа", storeSub:"Специальная распродажа · Всё должно уйти", cartLabel:"Товаров в корзине", viewCart:"Смотреть заказ", yourOrder:"Ваш заказ", total:"Итого", orderViaMessenger:"📨 Отправить заказ через Messenger", footer:"Вопросы? Напишите нам в Facebook Messenger", addToCart:"В корзину", sold:"Продано", emptyCart:"Корзина пуста", sentTitle:"Заказ отправлен!", sentDesc:"Мы подтвердим ваш заказ в Messenger в ближайшее время.", backToShop:"Продолжить покупки", namePlaceholder:"Ваше имя", phonePlaceholder:"Номер телефона", nameRequired:"Пожалуйста, введите имя", orderMsg:"Здравствуйте! Я хотел бы заказать:\n\n{items}\n\nИтого: ₾{total}\n\nИмя: {name}\nТелефон: {phone}\nID заказа: {orderId}", cats:{wallets:"Кошельки и сумки",perfume:"Духи и красота",accessories:"Аксессуары",other:"Другое"} },
+  ge: { storeName:"გაყიდვა", storeSub:"სპეციალური გაყიდვა · ყველაფერი უნდა გაიყიდოს", cartLabel:"პროდუქტი კალათაში", viewCart:"შეკვეთის ნახვა", yourOrder:"თქვენი შეკვეთა", total:"სულ", orderViaMessenger:"📨 შეკვეთის გაგზავნა Messenger-ით", footer:"კითხვები? დაგვიკავშირდით Facebook Messenger-ზე", addToCart:"კალათაში", sold:"გაყიდულია", emptyCart:"კალათა ცარიელია", sentTitle:"შეკვეთა გაიგზავნა!", sentDesc:"მალე დაგიდასტურებთ Messenger-ში.", backToShop:"გაგრძელება", namePlaceholder:"თქვენი სახელი", phonePlaceholder:"ტელეფონის ნომერი", nameRequired:"გთხოვთ შეიყვანოთ სახელი", orderMsg:"გამარჯობა! მე მინდა შევუკვეთო:\n\n{items}\n\nსულ: ₾{total}\n\nსახელი: {name}\nტელეფონი: {phone}\nშეკვეთის ID: {orderId}", cats:{wallets:"საფულეები და ჩანთები",perfume:"სუნამო და სილამაზე",accessories:"აქსესუარები",other:"სხვა"} }
 };
 const CATEGORIES = [{key:"wallets",emoji:"👛"},{key:"perfume",emoji:"🌸"},{key:"accessories",emoji:"🎀"},{key:"other",emoji:"🎁"}];
 
@@ -146,7 +154,10 @@ let cart = {}, products = [];
 
 window.setLang = l => { lang=l; document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===l)); applyT(); renderCatalog(); updateBar(); };
 const t = k => T[lang][k] || k;
-function applyT() { document.querySelectorAll('[data-t]').forEach(el => { const v=T[lang][el.getAttribute('data-t')]; if(v!==undefined) el.textContent=v; }); }
+function applyT() {
+  document.querySelectorAll('[data-t]').forEach(el => { const v=T[lang][el.getAttribute('data-t')]; if(v!==undefined) el.textContent=v; });
+  document.querySelectorAll('[data-t-placeholder]').forEach(el => { const v=T[lang][el.getAttribute('data-t-placeholder')]; if(v!==undefined) el.placeholder=v; });
+}
 
 onSnapshot(collection(db,"products"), snap => {
   products = snap.docs.map(d=>({firestoreId:d.id,...d.data()}));
@@ -210,12 +221,18 @@ function renderPanel() {
 
 window.sendOrder = async () => {
   const entries=Object.entries(cart); if(!entries.length)return;
-  const orderItems=entries.map(([id,qty])=>{ const p=products.find(x=>x.id===id); return {id,qty,name:p?.name?.ru||id,price:p?.price||0}; });
+  const nameEl=document.getElementById('orderName');
+  const name=nameEl.value.trim();
+  if(!name){ nameEl.classList.add('error'); nameEl.focus(); setTimeout(()=>nameEl.classList.remove('error'),1200); return; }
+  const phone=document.getElementById('orderPhone').value.trim();
+  const orderItems=entries.map(([id,qty])=>{ const p=products.find(x=>x.id===id); return {id,qty,name:p?.name?.[lang]||p?.name?.ru||id,price:p?.price||0}; });
   const orderId='ORD-'+Date.now();
-  try { await addDoc(collection(db,"orders"),{orderId,status:'pending',createdAt:serverTimestamp(),items:orderItems,total:totalPrice(),lang}); } catch(e){console.error(e);}
+  try { await addDoc(collection(db,"orders"),{orderId,status:'pending',createdAt:serverTimestamp(),items:orderItems,total:totalPrice(),lang,customerName:name,customerPhone:phone}); } catch(e){console.error(e);}
   const lines=orderItems.map(i=>`• [${i.id}] ${i.name} × ${i.qty} — ₾${i.price*i.qty}`).join('\n');
-  window.open(`${MESSENGER_URL}?text=${encodeURIComponent(`Здравствуйте! Хочу заказать:\n\n${lines}\n\nИтого: ₾${totalPrice()}\nID: ${orderId}`)}`, '_blank');
-  cart={}; closeCart(); updateBar(); renderCatalog();
+  const msg=T[lang].orderMsg.replace('{items}',lines).replace('{total}',totalPrice()).replace('{name}',name).replace('{phone}',phone||'—').replace('{orderId}',orderId);
+  window.open(`${MESSENGER_URL}?text=${encodeURIComponent(msg)}`, '_blank');
+  cart={}; nameEl.value=''; document.getElementById('orderPhone').value='';
+  closeCart(); updateBar(); renderCatalog();
   document.getElementById('orderSent').classList.add('show');
 };
 window.dismissSent = () => document.getElementById('orderSent').classList.remove('show');

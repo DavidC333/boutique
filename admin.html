@@ -207,12 +207,23 @@ onSnapshot(collection(db,"products"), snap => {
 });
 
 // ── ORDERS ────────────────────────────────────────────
-window.confirmOrder = async (firestoreId, items) => {
+const MESSENGER_URL = "https://www.messenger.com/e2ee/t/1192818532433919";
+const CONFIRM_MSG = {
+  ru: (name) => `Здравствуйте, ${name}! Ваш заказ принят ✅\nКак только будет готов к выдаче — напишем вам.\nАдрес: г. Батуми, Шериф Химшиашвили 27`,
+  en: (name) => `Hello, ${name}! Your order is confirmed ✅\nWe'll contact you when it's ready for pickup.\nAddress: 27 Sherif Khimshiashvili St, Batumi`,
+  ge: (name) => `გამარჯობა, ${name}! თქვენი შეკვეთა მიღებულია ✅\nროდესაც მზად იქნება — დაგიკავშირდებით.\nმისამართი: ბათუმი, შერიფ ხიმშიაშვილი 27`,
+};
+
+window.confirmOrder = async (firestoreId, items, orderLang, customerName) => {
   await updateDoc(doc(db,"orders",firestoreId),{status:'confirmed'});
   for (const item of items) {
     const p = products.find(x=>x.id===item.id);
     if (p) await updateDoc(doc(db,"products",p._id),{sold:true});
   }
+  const lang = orderLang && CONFIRM_MSG[orderLang] ? orderLang : 'ge';
+  const name = customerName || '—';
+  const msg = CONFIRM_MSG[lang](name);
+  window.open(`${MESSENGER_URL}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 window.rejectOrder = async firestoreId => { await updateDoc(doc(db,"orders",firestoreId),{status:'rejected'}); };
 window.undoOrder = async (firestoreId, status, items) => {
@@ -244,11 +255,13 @@ function renderOrders() {
   el.innerHTML = sorted.map(o => {
     const itemsHtml = (o.items||[]).map(i=>`<div class="order-item-row"><span class="order-item-sku">${i.id}</span><span class="order-item-name">${i.name}</span><span style="color:var(--muted);font-size:12px">×${i.qty}</span><span class="order-item-price">₾${i.price*i.qty}</span></div>`).join('');
     const itemsJson = encodeURIComponent(JSON.stringify(o.items||[]));
+    const safeName = (o.customerName||'').replace(/'/g,"\\'");
     const actions = o.status==='pending'
-      ? `<button class="btn btn-accept" onclick="confirmOrder('${o._id}',JSON.parse(decodeURIComponent('${itemsJson}')))">✅ Принять</button><button class="btn btn-reject" onclick="rejectOrder('${o._id}')">❌ Отклонить</button>`
+      ? `<button class="btn btn-accept" onclick="confirmOrder('${o._id}',JSON.parse(decodeURIComponent('${itemsJson}')),'${o.lang||''}','${safeName}')">✅ Принять</button><button class="btn btn-reject" onclick="rejectOrder('${o._id}')">❌ Отклонить</button>`
       : `<button class="btn btn-undo" onclick="undoOrder('${o._id}','${o.status}',JSON.parse(decodeURIComponent('${itemsJson}')))">↩ Отменить</button>`;
+    const customerInfo = o.customerName ? `<div class="order-ts">${o.customerName}${o.customerPhone?' · '+o.customerPhone:''}</div>` : '';
     return `<div class="order-card">
-      <div class="order-header"><div><div class="order-id">${o.orderId||o._id}</div><div class="order-ts">${fmtTime(o.createdAt)}</div></div><span class="status-badge status-${o.status}">${labels[o.status]||o.status}</span><div class="order-total">₾${o.total}</div></div>
+      <div class="order-header"><div><div class="order-id">${o.orderId||o._id}</div><div class="order-ts">${fmtTime(o.createdAt)}</div>${customerInfo}</div><span class="status-badge status-${o.status}">${labels[o.status]||o.status}</span><div class="order-total">₾${o.total}</div></div>
       <div class="order-items">${itemsHtml}</div>
       <div class="order-actions">${actions}</div>
     </div>`;
