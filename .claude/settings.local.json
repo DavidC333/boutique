@@ -2,9 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(git push:*)",
-      "Skill(update-config)",
-      "Bash(bash -c 'git -C \"C:/Users/User/Desktop/boutique\" add -A && git -C \"C:/Users/User/Desktop/boutique\" diff --staged --quiet || \\(git -C \"C:/Users/User/Desktop/boutique\" commit -m \"Auto-commit: update files\" && git -C \"C:/Users/User/Desktop/boutique\" push origin master\\)')",
-      "Bash(echo \"exit: $?\")"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Skill(update-config)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git -C \"C:/Users/User/Desktop/boutique\" add -A && git -C \"C:/Users/User/Desktop/boutique\" diff --staged --quiet || (git -C \"C:/Users/User/Desktop/boutique\" commit -m \"Auto-commit: update files\" && git -C \"C:/Users/User/Desktop/boutique\" push origin master) 2>/dev/null || true",
+            "statusMessage": "Pushing to GitHub..."
+          }
+        ]
+      }
     ]
   }
 }
