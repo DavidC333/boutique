@@ -82,13 +82,18 @@
   .order-sent button { margin-top:8px; background:var(--gold); color:#fff; border:none; padding:12px 28px; font-family:'DM Sans',sans-serif; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; border-radius:2px; }
   footer { text-align:center; padding:28px; font-size:11px; color:var(--muted); letter-spacing:0.08em; border-top:1px solid var(--border); }
   .search-bar { background:var(--cream); border-bottom:1px solid var(--border); padding:12px 32px; }
-  .search-inner { max-width:1100px; margin:0 auto; position:relative; display:flex; align-items:center; }
+  .search-inner { max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:12px; }
+  .search-wrap { flex:1; position:relative; display:flex; align-items:center; }
   .search-input { width:100%; padding:10px 36px; border:1px solid var(--border); border-radius:3px; font-family:'DM Sans',sans-serif; font-size:13px; background:var(--card-bg); color:var(--dark); outline:none; transition:border-color 0.2s; }
   .search-input:focus { border-color:var(--gold); }
   .search-icon { position:absolute; left:12px; color:var(--muted); font-size:15px; pointer-events:none; line-height:1; }
   .search-clear { position:absolute; right:10px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:15px; line-height:1; padding:4px; transition:color 0.15s; }
   .search-clear:hover { color:var(--dark); }
-  @media(max-width:600px) { .cart-bar{padding:10px 16px;} main{padding:28px 14px 60px;} .lang-bar{padding:8px 16px;} .search-bar{padding:10px 16px;} }
+  .sort-btns { display:flex; gap:6px; flex-shrink:0; }
+  .sort-btn { background:none; border:1px solid var(--border); color:var(--muted); font-family:'DM Sans',sans-serif; font-size:11px; letter-spacing:0.04em; padding:7px 12px; border-radius:2px; cursor:pointer; white-space:nowrap; transition:all 0.2s; }
+  .sort-btn:hover { border-color:var(--gold-light); color:var(--dark); }
+  .sort-btn.active { background:var(--gold); border-color:var(--gold); color:#fff; }
+  @media(max-width:600px) { .cart-bar{padding:10px 16px;} main{padding:28px 14px 60px;} .lang-bar{padding:8px 16px;} .search-bar{padding:10px 16px;} .search-inner{flex-wrap:wrap;} .sort-btns{width:100%;} .sort-btn{flex:1;text-align:center;} }
 </style>
 </head>
 <body>
@@ -107,9 +112,16 @@
 </div>
 <div class="search-bar">
   <div class="search-inner">
-    <span class="search-icon">⌕</span>
-    <input class="search-input" type="text" id="searchInput" data-t-placeholder="searchPlaceholder" oninput="onSearch(this.value)">
-    <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</button>
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input class="search-input" type="text" id="searchInput" data-t-placeholder="searchPlaceholder" oninput="onSearch(this.value)">
+      <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</button>
+    </div>
+    <div class="sort-btns">
+      <button class="sort-btn" id="sort-price-asc" data-t="sortPriceAsc" onclick="setSort('price-asc')"></button>
+      <button class="sort-btn" id="sort-price-desc" data-t="sortPriceDesc" onclick="setSort('price-desc')"></button>
+      <button class="sort-btn" id="sort-new" data-t="sortNew" onclick="setSort('new')"></button>
+    </div>
   </div>
 </div>
 <main id="catalog"><div class="loading-screen"><div class="spinner"></div><p>Загрузка товаров...</p></div></main>
@@ -155,16 +167,16 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const T = {
-  en: { storeName:"Boutique Clearance", storeSub:"Special sale · Everything must go", cartLabel:"Items in cart", viewCart:"View Order", yourOrder:"Your Order", total:"Total", orderViaMessenger:"📨 Send order via Messenger", footer:"Questions? Write us on Facebook Messenger", addToCart:"Add to cart", sold:"Sold out", emptyCart:"Your cart is empty", sentTitle:"Order sent!", sentDesc:"We'll confirm your order via Messenger shortly.", backToShop:"Continue shopping", searchPlaceholder:"Search...", notFound:"Nothing found", namePlaceholder:"Your name", phonePlaceholder:"Phone number", nameRequired:"Please enter your name", orderMsg:"Hello! I would like to order:\n\n{items}\n\nTotal: ₾{total}\n\nName: {name}\nPhone: {phone}\nOrder ID: {orderId}", cats:{wallets:"Wallets & Bags",perfume:"Perfume & Beauty",accessories:"Accessories",other:"Other"} },
-  ru: { storeName:"Распродажа", storeSub:"Специальная распродажа · Всё должно уйти", cartLabel:"Товаров в корзине", viewCart:"Смотреть заказ", yourOrder:"Ваш заказ", total:"Итого", orderViaMessenger:"📨 Отправить заказ через Messenger", footer:"Вопросы? Напишите нам в Facebook Messenger", addToCart:"В корзину", sold:"Продано", emptyCart:"Корзина пуста", sentTitle:"Заказ отправлен!", sentDesc:"Мы подтвердим ваш заказ в Messenger в ближайшее время.", backToShop:"Продолжить покупки", searchPlaceholder:"Поиск...", notFound:"Ничего не найдено", namePlaceholder:"Ваше имя", phonePlaceholder:"Номер телефона", nameRequired:"Пожалуйста, введите имя", orderMsg:"Здравствуйте! Я хотел бы заказать:\n\n{items}\n\nИтого: ₾{total}\n\nИмя: {name}\nТелефон: {phone}\nID заказа: {orderId}", cats:{wallets:"Кошельки и сумки",perfume:"Духи и красота",accessories:"Аксессуары",other:"Другое"} },
-  ge: { storeName:"გაყიდვა", storeSub:"სპეციალური გაყიდვა · ყველაფერი უნდა გაიყიდოს", cartLabel:"პროდუქტი კალათაში", viewCart:"შეკვეთის ნახვა", yourOrder:"თქვენი შეკვეთა", total:"სულ", orderViaMessenger:"📨 შეკვეთის გაგზავნა Messenger-ით", footer:"კითხვები? დაგვიკავშირდით Facebook Messenger-ზე", addToCart:"კალათაში", sold:"გაყიდულია", emptyCart:"კალათა ცარიელია", sentTitle:"შეკვეთა გაიგზავნა!", sentDesc:"მალე დაგიდასტურებთ Messenger-ში.", backToShop:"გაგრძელება", searchPlaceholder:"ძებნა...", notFound:"ვერაფერი მოიძებნა", namePlaceholder:"თქვენი სახელი", phonePlaceholder:"ტელეფონის ნომერი", nameRequired:"გთხოვთ შეიყვანოთ სახელი", orderMsg:"გამარჯობა! მე მინდა შევუკვეთო:\n\n{items}\n\nსულ: ₾{total}\n\nსახელი: {name}\nტელეფონი: {phone}\nშეკვეთის ID: {orderId}", cats:{wallets:"საფულეები და ჩანთები",perfume:"სუნამო და სილამაზე",accessories:"აქსესუარები",other:"სხვა"} }
+  en: { storeName:"Boutique Clearance", storeSub:"Special sale · Everything must go", cartLabel:"Items in cart", viewCart:"View Order", yourOrder:"Your Order", total:"Total", orderViaMessenger:"📨 Send order via Messenger", footer:"Questions? Write us on Facebook Messenger", addToCart:"Add to cart", sold:"Sold out", emptyCart:"Your cart is empty", sentTitle:"Order sent!", sentDesc:"We'll confirm your order via Messenger shortly.", backToShop:"Continue shopping", searchPlaceholder:"Search...", notFound:"Nothing found", sortPriceAsc:"Price ↑", sortPriceDesc:"Price ↓", sortNew:"New first", namePlaceholder:"Your name", phonePlaceholder:"Phone number", nameRequired:"Please enter your name", orderMsg:"Hello! I would like to order:\n\n{items}\n\nTotal: ₾{total}\n\nName: {name}\nPhone: {phone}\nOrder ID: {orderId}", cats:{wallets:"Wallets & Bags",perfume:"Perfume & Beauty",accessories:"Accessories",other:"Other"} },
+  ru: { storeName:"Распродажа", storeSub:"Специальная распродажа · Всё должно уйти", cartLabel:"Товаров в корзине", viewCart:"Смотреть заказ", yourOrder:"Ваш заказ", total:"Итого", orderViaMessenger:"📨 Отправить заказ через Messenger", footer:"Вопросы? Напишите нам в Facebook Messenger", addToCart:"В корзину", sold:"Продано", emptyCart:"Корзина пуста", sentTitle:"Заказ отправлен!", sentDesc:"Мы подтвердим ваш заказ в Messenger в ближайшее время.", backToShop:"Продолжить покупки", searchPlaceholder:"Поиск...", notFound:"Ничего не найдено", sortPriceAsc:"по цене ↑", sortPriceDesc:"по цене ↓", sortNew:"новые сначала", namePlaceholder:"Ваше имя", phonePlaceholder:"Номер телефона", nameRequired:"Пожалуйста, введите имя", orderMsg:"Здравствуйте! Я хотел бы заказать:\n\n{items}\n\nИтого: ₾{total}\n\nИмя: {name}\nТелефон: {phone}\nID заказа: {orderId}", cats:{wallets:"Кошельки и сумки",perfume:"Духи и красота",accessories:"Аксессуары",other:"Другое"} },
+  ge: { storeName:"გაყიდვა", storeSub:"სპეციალური გაყიდვა · ყველაფერი უნდა გაიყიდოს", cartLabel:"პროდუქტი კალათაში", viewCart:"შეკვეთის ნახვა", yourOrder:"თქვენი შეკვეთა", total:"სულ", orderViaMessenger:"📨 შეკვეთის გაგზავნა Messenger-ით", footer:"კითხვები? დაგვიკავშირდით Facebook Messenger-ზე", addToCart:"კალათაში", sold:"გაყიდულია", emptyCart:"კალათა ცარიელია", sentTitle:"შეკვეთა გაიგზავნა!", sentDesc:"მალე დაგიდასტურებთ Messenger-ში.", backToShop:"გაგრძელება", searchPlaceholder:"ძებნა...", notFound:"ვერაფერი მოიძებნა", sortPriceAsc:"ფასი ↑", sortPriceDesc:"ფასი ↓", sortNew:"ახალი პირველი", namePlaceholder:"თქვენი სახელი", phonePlaceholder:"ტელეფონის ნომერი", nameRequired:"გთხოვთ შეიყვანოთ სახელი", orderMsg:"გამარჯობა! მე მინდა შევუკვეთო:\n\n{items}\n\nსულ: ₾{total}\n\nსახელი: {name}\nტელეფონი: {phone}\nშეკვეთის ID: {orderId}", cats:{wallets:"საფულეები და ჩანთები",perfume:"სუნამო და სილამაზე",accessories:"აქსესუარები",other:"სხვა"} }
 };
 const CATEGORIES = [{key:"wallets",emoji:"👛"},{key:"perfume",emoji:"🌸"},{key:"accessories",emoji:"🎀"},{key:"other",emoji:"🎁"}];
 
 const _allLangs = [navigator.language, ...(navigator.languages || [])].filter(Boolean);
 const _hasLang = prefix => _allLangs.some(l => l.startsWith(prefix));
 let lang = _hasLang('ka') ? 'ge' : _hasLang('ru') ? 'ru' : 'en';
-let cart = {}, products = [], searchQuery = '';
+let cart = {}, products = [], searchQuery = '', sortMode = '';
 
 window.setLang = l => { lang=l; document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===l)); applyT(); renderCatalog(); updateBar(); };
 const t = k => T[lang][k] || k;
@@ -181,12 +193,24 @@ onSnapshot(collection(db,"products"), snap => {
 
 window.onSearch = q => { searchQuery=q.trim().toLowerCase(); document.getElementById('searchClear').style.display=q?'block':'none'; renderCatalog(); };
 window.clearSearch = () => { searchQuery=''; document.getElementById('searchInput').value=''; document.getElementById('searchClear').style.display='none'; renderCatalog(); };
+window.setSort = mode => {
+  sortMode = sortMode===mode ? '' : mode;
+  document.querySelectorAll('.sort-btn').forEach(b=>b.classList.toggle('active', b.id==='sort-'+sortMode));
+  renderCatalog();
+};
+function applySorting(arr) {
+  if (sortMode==='price-asc') return [...arr].sort((a,b)=>a.price-b.price);
+  if (sortMode==='price-desc') return [...arr].sort((a,b)=>b.price-a.price);
+  if (sortMode==='new') return [...arr].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  return arr;
+}
 
 function renderCatalog() {
   const cat = document.getElementById('catalog');
   if (!products.length) { cat.innerHTML='<div class="loading-screen"><div class="spinner"></div><p>Загрузка...</p></div>'; return; }
   const q = searchQuery;
-  const visible = q ? products.filter(p=>(p.name?.[lang]||p.name?.ru||'').toLowerCase().includes(q)) : products;
+  const filtered = q ? products.filter(p=>(p.name?.[lang]||p.name?.ru||'').toLowerCase().includes(q)) : products;
+  const visible = applySorting(filtered);
   if (!visible.length) { cat.innerHTML=`<div class="loading-screen"><p style="font-size:15px">${t('notFound')}</p></div>`; return; }
   cat.innerHTML='';
   CATEGORIES.forEach(({key,emoji}) => {
