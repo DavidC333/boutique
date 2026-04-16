@@ -119,7 +119,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
-const MESSENGER_URL = "https://m.me/me"; // ✏️ замени на ссылку мамы
+const MESSENGER_URL = "https://www.messenger.com/e2ee/t/1192818532433919";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDsr51JFbm2HxwhorkUHnfVWOXRr5r4iy0",
@@ -139,7 +139,10 @@ const T = {
 };
 const CATEGORIES = [{key:"wallets",emoji:"👛"},{key:"perfume",emoji:"🌸"},{key:"accessories",emoji:"🎀"},{key:"other",emoji:"🎁"}];
 
-let lang = 'en', cart = {}, products = [];
+const _allLangs = [navigator.language, ...(navigator.languages || [])].filter(Boolean);
+const _hasLang = prefix => _allLangs.some(l => l.startsWith(prefix));
+let lang = _hasLang('ka') ? 'ge' : _hasLang('ru') ? 'ru' : 'en';
+let cart = {}, products = [];
 
 window.setLang = l => { lang=l; document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===l)); applyT(); renderCatalog(); updateBar(); };
 const t = k => T[lang][k] || k;
@@ -216,6 +219,7 @@ window.sendOrder = async () => {
   document.getElementById('orderSent').classList.add('show');
 };
 window.dismissSent = () => document.getElementById('orderSent').classList.remove('show');
+document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase() === lang));
 applyT();
 </script>
 </body>
