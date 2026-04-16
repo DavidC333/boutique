@@ -75,6 +75,10 @@
   .inv-card.is-sold .inv-name { text-decoration:line-through; }
   .inv-delete { background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; margin-left:4px; flex-shrink:0; }
   .inv-delete:hover { color:var(--red); }
+  .inv-flags { display:flex; gap:3px; flex-shrink:0; font-size:15px; line-height:1; }
+  .form-field.checkbox { flex-direction:row; align-items:center; gap:8px; padding-top:22px; }
+  .form-field.checkbox label { font-size:12px; color:var(--dark); text-transform:none; letter-spacing:0; cursor:pointer; font-weight:400; }
+  .form-field.checkbox input[type=checkbox] { width:15px; height:15px; accent-color:var(--gold); cursor:pointer; flex-shrink:0; }
 
   .loading-screen { text-align:center; padding:40px; color:var(--muted); }
   .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--gold); border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 12px; }
@@ -143,6 +147,8 @@
         <div class="form-field"><label>Название (EN)</label><input id="f-name-en" placeholder="Leather wallet"></div>
         <div class="form-field"><label>Название (GE)</label><input id="f-name-ge" placeholder="ტყავის საფულე"></div>
         <div class="form-field"><label>Описание (RU)</label><input id="f-desc-ru" placeholder="Краткое описание"></div>
+        <div class="form-field checkbox"><input type="checkbox" id="f-isNew"><label for="f-isNew">🆕 Новинка</label></div>
+        <div class="form-field checkbox"><input type="checkbox" id="f-isSale"><label for="f-isSale">🏷️ Скидка</label></div>
       </div>
       <button class="btn-add-product" onclick="addProduct()">+ Добавить товар</button>
     </div>
@@ -278,6 +284,7 @@ function renderInventory() {
   grid.innerHTML = products.map(p=>`<div class="inv-card${p.sold?' is-sold':''}">
     <div class="inv-emoji">${p.emoji||'🛍️'}</div>
     <div class="inv-info"><div class="inv-sku">${p.id}</div><div class="inv-name">${p.name?.ru||''}</div><div class="inv-price">₾${p.price}</div></div>
+    <div class="inv-flags">${p.isNew?'🆕':''}${p.isSale?'🏷️':''}</div>
     <button class="toggle-btn ${p.sold?'off':'on'}" onclick="toggleSold('${p._id}',${!!p.sold})" title="${p.sold?'Вернуть в продажу':'Пометить как продано'}"></button>
     <button class="inv-delete" onclick="deleteProduct('${p._id}','${(p.name?.ru||'').replace(/'/g,"\\'")}')">🗑</button>
   </div>`).join('');
@@ -306,10 +313,14 @@ window.addProduct = async () => {
   const nameEn = document.getElementById('f-name-en').value.trim();
   const nameGe = document.getElementById('f-name-ge').value.trim();
   const descRu = document.getElementById('f-desc-ru').value.trim();
+  const isNew = document.getElementById('f-isNew').checked;
+  const isSale = document.getElementById('f-isSale').checked;
   if (!id||!nameRu||!price) { alert('Заполни артикул, название и цену!'); return; }
   if (products.find(p=>p.id===id)) { alert(`Артикул ${id} уже существует!`); return; }
-  await addDoc(collection(db,"products"),{ id, cat, emoji, price, sold:false, name:{ru:nameRu,en:nameEn,ge:nameGe}, desc:{ru:descRu,en:'',ge:''}, createdAt:serverTimestamp() });
+  await addDoc(collection(db,"products"),{ id, cat, emoji, price, sold:false, isNew, isSale, name:{ru:nameRu,en:nameEn,ge:nameGe}, desc:{ru:descRu,en:'',ge:''}, createdAt:serverTimestamp() });
   ['f-id','f-emoji','f-price','f-name-ru','f-name-en','f-name-ge','f-desc-ru'].forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('f-isNew').checked = false;
+  document.getElementById('f-isSale').checked = false;
   alert(`Товар ${id} добавлен!`);
 };
 </script>
