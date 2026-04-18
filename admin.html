@@ -83,6 +83,13 @@
   .inv-edit:hover { color:var(--gold); }
   .inv-delete { background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; margin-left:2px; flex-shrink:0; transition:color 0.15s; }
   .inv-delete:hover { color:var(--red); }
+  .stock-ctrl { display:inline-flex; align-items:center; gap:3px; flex-shrink:0; }
+  .stock-num { font-size:12px; font-weight:500; min-width:20px; text-align:center; }
+  .stock-num.low { color:var(--red); }
+  .qty-btn-sm { background:none; border:1px solid var(--border); color:var(--dark); width:20px; height:20px; border-radius:2px; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:all 0.15s; line-height:1; padding:0; }
+  .qty-btn-sm:hover { background:var(--gold); border-color:var(--gold); color:#fff; }
+  .form-field textarea { padding:8px 10px; border:1px solid var(--border); border-radius:2px; font-family:'DM Sans',sans-serif; font-size:12px; background:var(--bg); color:var(--dark); resize:vertical; min-height:64px; }
+  .form-field textarea:focus { outline:none; border-color:var(--gold); }
 
   /* EDIT MODAL */
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:500; align-items:center; justify-content:center; padding:20px; }
@@ -166,10 +173,13 @@
         </div>
         <div class="form-field"><label>Эмодзи</label><input id="f-emoji" placeholder="👛" maxlength="2"></div>
         <div class="form-field"><label>Цена (₾)</label><input id="f-price" type="number" placeholder="35"></div>
+        <div class="form-field"><label>Старая цена (₾)</label><input id="f-oldprice" type="number" placeholder="50"></div>
+        <div class="form-field"><label>Остаток (шт)</label><input id="f-stock" type="number" placeholder="1" value="1" min="0"></div>
         <div class="form-field"><label>Название (RU)</label><input id="f-name-ru" placeholder="Кошелёк кожаный"></div>
         <div class="form-field"><label>Название (EN)</label><input id="f-name-en" placeholder="Leather wallet"></div>
         <div class="form-field"><label>Название (GE)</label><input id="f-name-ge" placeholder="ტყავის საფულე"></div>
         <div class="form-field"><label>Описание (RU)</label><input id="f-desc-ru" placeholder="Краткое описание"></div>
+        <div class="form-field" style="grid-column:1/-1"><label>Фото (URL, по одному на строку)</label><textarea id="f-photos" placeholder="https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg"></textarea></div>
         <div class="form-field checkbox"><input type="checkbox" id="f-isNew"><label for="f-isNew">🆕 Новинка</label></div>
         <div class="form-field checkbox"><input type="checkbox" id="f-isSale"><label for="f-isSale">🏷️ Скидка</label></div>
       </div>
@@ -181,7 +191,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, increment } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -199,6 +209,7 @@ const auth = getAuth(app);
 let orders = [], products = [];
 let unsubOrders = null, unsubProducts = null;
 let statusFilter = '';
+const stockOf = p => p.stock !== undefined ? p.stock : (p.sold ? 0 : 99);
 
 const loginOverlay = document.getElementById('loginOverlay');
 const logoutBtn = document.getElementById('logoutBtn');
@@ -273,7 +284,7 @@ window.confirmOrder = async (firestoreId, items, orderLang, customerName) => {
   await updateDoc(doc(db,"orders",firestoreId),{status:'confirmed'});
   for (const item of items) {
     const p = products.find(x=>x.id===item.id);
-    if (p) await updateDoc(doc(db,"products",p._id),{sold:true});
+    if (p) await updateDoc(doc(db,"products",p._id),{stock: increment(-(item.qty||1))});
   }
   const lang = orderLang && CONFIRM_MSG[orderLang] ? orderLang : 'ge';
   const name = customerName || '—';
@@ -287,7 +298,7 @@ window.undoOrder = async (firestoreId, status, items) => {
   if (status==='confirmed') {
     for (const item of items) {
       const p = products.find(x=>x.id===item.id);
-      if (p) await updateDoc(doc(db,"products",p._id),{sold:false});
+      if (p) await updateDoc(doc(db,"products",p._id),{stock: increment(item.qty||1)});
     }
     await updateDoc(doc(db,"orders",firestoreId),{status:'messenger_pending'});
   } else if (status==='completed') {
@@ -295,6 +306,9 @@ window.undoOrder = async (firestoreId, status, items) => {
   } else {
     await updateDoc(doc(db,"orders",firestoreId),{status:'messenger_pending'});
   }
+};
+window.adjustStock = async (firestoreId, delta) => {
+  await updateDoc(doc(db,"products",firestoreId),{stock: increment(delta)});
 };
 
 function fmtTime(ts) {
@@ -345,31 +359,40 @@ function renderOrders() {
 }
 
 // ── INVENTORY ─────────────────────────────────────────
-window.toggleSold = async (firestoreId, currentSold) => { await updateDoc(doc(db,"products",firestoreId),{sold:!currentSold}); };
 window.deleteProduct = async (firestoreId, name) => { if(confirm(`Удалить "${name}"?`)) await deleteDoc(doc(db,"products",firestoreId)); };
 
 function renderInventory() {
   const grid = document.getElementById('inventoryGrid');
   if (!products.length) { grid.innerHTML='<div class="empty-state"><div class="icon">📦</div>Товаров нет. Добавьте первый!</div>'; return; }
-  grid.innerHTML = products.map(p=>`<div class="inv-card${p.sold?' is-sold':''}">
+  grid.innerHTML = products.map(p=>{
+    const st = stockOf(p);
+    const stockCtrl = `<div class="stock-ctrl">
+      <button class="qty-btn-sm" onclick="adjustStock('${p._id}',-1)">−</button>
+      <span class="stock-num${st<=3?' low':''}">${st}</span>
+      <button class="qty-btn-sm" onclick="adjustStock('${p._id}',1)">+</button>
+    </div>`;
+    const priceStr = p.oldPrice ? `₾${p.price} <s style="color:var(--muted);font-size:11px">₾${p.oldPrice}</s>` : `₾${p.price}`;
+    return `<div class="inv-card${st<=0?' is-sold':''}">
     <div class="inv-emoji">${p.emoji||'🛍️'}</div>
-    <div class="inv-info"><div class="inv-sku">${p.id}</div><div class="inv-name">${p.name?.ru||''}</div><div class="inv-price">₾${p.price}</div></div>
+    <div class="inv-info"><div class="inv-sku">${p.id}</div><div class="inv-name">${p.name?.ru||''}</div><div class="inv-price">${priceStr}</div></div>
     <div class="inv-flags">${p.isNew?'🆕':''}${p.isSale?'🏷️':''}</div>
-    <button class="toggle-btn ${p.sold?'off':'on'}" onclick="toggleSold('${p._id}',${!!p.sold})" title="${p.sold?'Вернуть в продажу':'Пометить как продано'}"></button>
+    ${stockCtrl}
     <button class="inv-edit" onclick="openEditModal('${p._id}')" title="Редактировать">✏️</button>
     <button class="inv-delete" onclick="deleteProduct('${p._id}','${(p.name?.ru||'').replace(/'/g,"\\'")}')">🗑</button>
-  </div>`).join('');
+  </div>`;
+  }).join('');
 }
 
 // ── STATS ─────────────────────────────────────────────
 function renderStats() {
   const pending = orders.filter(o=>o.status==='messenger_pending'||o.status==='pending').length;
   const confirmed = orders.filter(o=>o.status==='confirmed').length;
-  const sold = products.filter(p=>p.sold).length;
+  const sold = orders.filter(o=>o.status==='confirmed'||o.status==='completed').length;
+  const available = products.filter(p=>stockOf(p)>0).length;
   document.getElementById('s-pending').textContent = pending;
   document.getElementById('s-confirmed').textContent = confirmed;
   document.getElementById('s-sold').textContent = sold;
-  document.getElementById('s-available').textContent = products.length - sold;
+  document.getElementById('s-available').textContent = available;
   const badge = document.getElementById('pendingBadge');
   badge.textContent = pending; badge.style.display = pending>0?'inline-flex':'none';
 }
@@ -386,10 +409,14 @@ window.addProduct = async () => {
   const descRu = document.getElementById('f-desc-ru').value.trim();
   const isNew = document.getElementById('f-isNew').checked;
   const isSale = document.getElementById('f-isSale').checked;
+  const oldPrice = parseFloat(document.getElementById('f-oldprice').value)||null;
+  const stock = parseInt(document.getElementById('f-stock').value) ?? 1;
+  const photos = document.getElementById('f-photos').value.split('\n').map(u=>u.trim()).filter(Boolean);
   if (!id||!nameRu||!price) { alert('Заполни артикул, название и цену!'); return; }
   if (products.find(p=>p.id===id)) { alert(`Артикул ${id} уже существует!`); return; }
-  await addDoc(collection(db,"products"),{ id, cat, emoji, price, sold:false, isNew, isSale, name:{ru:nameRu,en:nameEn,ge:nameGe}, desc:{ru:descRu,en:'',ge:''}, createdAt:serverTimestamp() });
-  ['f-id','f-emoji','f-price','f-name-ru','f-name-en','f-name-ge','f-desc-ru'].forEach(id=>{ document.getElementById(id).value=''; });
+  await addDoc(collection(db,"products"),{ id, cat, emoji, price, oldPrice, stock, isNew, isSale, name:{ru:nameRu,en:nameEn,ge:nameGe}, desc:{ru:descRu,en:'',ge:''}, photos, createdAt:serverTimestamp() });
+  ['f-id','f-emoji','f-price','f-oldprice','f-name-ru','f-name-en','f-name-ge','f-desc-ru','f-photos'].forEach(fid=>{ document.getElementById(fid).value=''; });
+  document.getElementById('f-stock').value = '1';
   document.getElementById('f-isNew').checked = false;
   document.getElementById('f-isSale').checked = false;
   alert(`Товар ${id} добавлен!`);
@@ -410,6 +437,10 @@ window.openEditModal = firestoreId => {
   document.getElementById('e-name-en').value = p.name?.en || '';
   document.getElementById('e-name-ge').value = p.name?.ge || '';
   document.getElementById('e-desc-ru').value = p.desc?.ru || '';
+  document.getElementById('e-stock').value = p.stock !== undefined ? p.stock : (p.sold ? 0 : 1);
+  document.getElementById('e-oldprice').value = p.oldPrice || '';
+  const existingPhotos = p.photos?.length ? p.photos : (p.photoUrl ? [p.photoUrl] : []);
+  document.getElementById('e-photos').value = existingPhotos.join('\n');
   document.getElementById('e-isNew').checked = !!p.isNew;
   document.getElementById('e-isSale').checked = !!p.isSale;
   document.getElementById('editModal').classList.add('open');
@@ -429,6 +460,9 @@ window.saveProduct = async () => {
     cat: document.getElementById('e-cat').value,
     emoji: document.getElementById('e-emoji').value.trim() || '🛍️',
     price,
+    oldPrice: parseFloat(document.getElementById('e-oldprice').value)||null,
+    stock: parseInt(document.getElementById('e-stock').value)||0,
+    photos: document.getElementById('e-photos').value.split('\n').map(u=>u.trim()).filter(Boolean),
     name: { ru: nameRu, en: document.getElementById('e-name-en').value.trim(), ge: document.getElementById('e-name-ge').value.trim() },
     desc: { ru: document.getElementById('e-desc-ru').value.trim(), en: '', ge: '' },
     isNew: document.getElementById('e-isNew').checked,
@@ -453,10 +487,13 @@ window.saveProduct = async () => {
       </div>
       <div class="form-field"><label>Эмодзи</label><input id="e-emoji" maxlength="2"></div>
       <div class="form-field"><label>Цена (₾)</label><input id="e-price" type="number"></div>
+      <div class="form-field"><label>Старая цена (₾)</label><input id="e-oldprice" type="number"></div>
+      <div class="form-field"><label>Остаток (шт)</label><input id="e-stock" type="number" min="0"></div>
       <div class="form-field"><label>Название (RU)</label><input id="e-name-ru"></div>
       <div class="form-field"><label>Название (EN)</label><input id="e-name-en"></div>
       <div class="form-field"><label>Название (GE)</label><input id="e-name-ge"></div>
       <div class="form-field"><label>Описание (RU)</label><input id="e-desc-ru"></div>
+      <div class="form-field" style="grid-column:1/-1"><label>Фото (URL, по одному на строку)</label><textarea id="e-photos"></textarea></div>
       <div class="form-field checkbox"><input type="checkbox" id="e-isNew"><label for="e-isNew">🆕 Новинка</label></div>
       <div class="form-field checkbox"><input type="checkbox" id="e-isSale"><label for="e-isSale">🏷️ Скидка</label></div>
     </div>

@@ -50,6 +50,28 @@
   .sold-btn { width:100%; padding:9px; background:#eee; color:var(--muted); border:none; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; margin-top:10px; border-radius:2px; cursor:default; }
   .share-btn { background:none; border:none; color:var(--muted); font-size:13px; cursor:pointer; padding:4px 0; transition:color 0.2s; display:inline-flex; align-items:center; gap:5px; font-family:'DM Sans',sans-serif; letter-spacing:0.04em; }
   .share-btn:hover { color:var(--gold); }
+  .price-old { text-decoration:line-through; color:var(--muted); font-size:14px; font-weight:300; margin-right:5px; font-family:'DM Sans',sans-serif; }
+  .stock-warn { font-size:11px; color:var(--badge); font-weight:500; margin-top:2px; letter-spacing:0.02em; }
+  .gal-wrap { position:relative; width:100%; height:100%; }
+  .gal-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
+  .gal-arrow { position:absolute; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.32); color:#fff; border:none; width:28px; height:28px; border-radius:50%; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.2s; line-height:1; padding:0; z-index:2; }
+  .gal-arrow:hover { background:rgba(0,0,0,0.6); }
+  .gal-prev { left:6px; }
+  .gal-next { right:6px; }
+  .gal-dots { position:absolute; bottom:6px; left:50%; transform:translateX(-50%); display:flex; gap:4px; z-index:2; }
+  .gal-dot { width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,0.45); transition:background 0.2s; }
+  .gal-dot.active { background:#fff; }
+  .confirm-overlay { display:none; position:fixed; inset:0; background:rgba(26,20,16,0.82); z-index:250; align-items:center; justify-content:center; padding:20px; }
+  .confirm-overlay.open { display:flex; }
+  .confirm-box { background:var(--card-bg); border-radius:6px; padding:28px 24px; width:min(380px,100%); max-height:85vh; overflow-y:auto; }
+  .confirm-title { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:400; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+  .confirm-item-row { display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:7px 0; border-bottom:1px solid var(--border); gap:8px; }
+  .confirm-item-name { flex:1; color:var(--dark); }
+  .confirm-item-price { color:var(--gold); white-space:nowrap; font-family:'Cormorant Garamond',serif; font-size:15px; }
+  .confirm-total { display:flex; justify-content:space-between; align-items:center; font-family:'Cormorant Garamond',serif; font-size:20px; margin:12px 0 6px; }
+  .confirm-hint { font-size:12px; color:var(--muted); line-height:1.55; margin:12px 0 18px; text-align:center; }
+  .confirm-back { display:block; width:100%; margin-top:10px; background:none; border:none; color:var(--muted); font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; padding:8px; text-align:center; transition:color 0.2s; }
+  .confirm-back:hover { color:var(--dark); }
   .toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--dark); color:#fff; font-family:'DM Sans',sans-serif; font-size:13px; padding:10px 22px; border-radius:8px; opacity:0; pointer-events:none; transition:opacity 0.3s,transform 0.3s; z-index:400; }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   .product-card.highlight { border-color:var(--gold); box-shadow:0 0 0 2px var(--gold); }
@@ -156,7 +178,7 @@
       <input class="contact-input" type="text" id="orderName" data-t-placeholder="namePlaceholder">
       <input class="contact-input" type="tel" id="orderPhone" data-t-placeholder="phonePlaceholder">
     </div>
-    <button class="messenger-btn" onclick="sendOrder()" data-t="orderViaMessenger"></button>
+    <button class="messenger-btn" onclick="prepareLead()" data-t="orderViaMessenger"></button>
   </div>
 </div>
 <div class="order-sent" id="orderSent">
@@ -166,6 +188,15 @@
   <button onclick="dismissSent()" data-t="backToShop"></button>
 </div>
 
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirmTitleEl"></div>
+    <div id="confirmItems"></div>
+    <p class="confirm-hint" id="confirmHintEl"></p>
+    <button class="messenger-btn" onclick="sendLead()" id="confirmMessengerBtn"></button>
+    <button class="confirm-back" onclick="closeConfirm()" id="confirmBackBtn"></button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
@@ -187,9 +218,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const T = {
-  en: { storeName:"Boutique Clearance", storeSub:"Special sale · Everything must go", cartLabel:"Items in cart", viewCart:"View Request", yourOrder:"Your Request", total:"Total", orderViaMessenger:"📨 Continue in Messenger", footer:"Questions? Write us on Facebook Messenger", addToCart:"Add to cart", sold:"Sold out", emptyCart:"Your cart is empty", sentTitle:"Request sent!", sentDesc:"Your request was saved. Please continue in Messenger so we can confirm availability.", backToShop:"Continue shopping", searchPlaceholder:"Search...", notFound:"Nothing found", badgeNew:"New", badgeSale:"Sale", sortPriceAsc:"Price ↑", sortPriceDesc:"Price ↓", sortNew:"New first", namePlaceholder:"Your name", phonePlaceholder:"Phone number", nameRequired:"Please enter your name", orderMsg:"Hello! I'd like to request:\n\n{items}\n\nTotal: ₾{total}\n\nName: {name}\nPhone: {phone}\nRequest ID: {orderId}", linkCopied:"Link copied!", share:"Share", filterAll:"All", filterWallets:"Wallets", filterPerfume:"Perfume", filterAccessories:"Accessories", filterOther:"Other", cats:{wallets:"Wallets & Bags",perfume:"Perfume & Beauty",accessories:"Accessories",other:"Other"} },
-  ru: { storeName:"Распродажа", storeSub:"Специальная распродажа · Всё должно уйти", cartLabel:"Товаров в корзине", viewCart:"Смотреть заявку", yourOrder:"Ваша заявка", total:"Итого", orderViaMessenger:"📨 Продолжить в Messenger", footer:"Вопросы? Напишите нам в Facebook Messenger", addToCart:"В корзину", sold:"Продано", emptyCart:"Корзина пуста", sentTitle:"Заявка отправлена!", sentDesc:"Ваша заявка сохранена. Продолжите в Messenger — мы подтвердим наличие.", backToShop:"Продолжить покупки", searchPlaceholder:"Поиск...", notFound:"Ничего не найдено", badgeNew:"Новинка", badgeSale:"Скидка", sortPriceAsc:"по цене ↑", sortPriceDesc:"по цене ↓", sortNew:"новые сначала", namePlaceholder:"Ваше имя", phonePlaceholder:"Номер телефона", nameRequired:"Пожалуйста, введите имя", orderMsg:"Здравствуйте! Хочу оформить заявку:\n\n{items}\n\nИтого: ₾{total}\n\nИмя: {name}\nТелефон: {phone}\nID заявки: {orderId}", linkCopied:"Ссылка скопирована!", share:"Поделиться", filterAll:"Все", filterWallets:"Кошельки", filterPerfume:"Духи", filterAccessories:"Аксессуары", filterOther:"Другое", cats:{wallets:"Кошельки и сумки",perfume:"Духи и красота",accessories:"Аксессуары",other:"Другое"} },
-  ge: { storeName:"გაყიდვა", storeSub:"სპეციალური გაყიდვა · ყველაფერი უნდა გაიყიდოს", cartLabel:"პროდუქტი კალათაში", viewCart:"განაცხადის ნახვა", yourOrder:"თქვენი განაცხადი", total:"სულ", orderViaMessenger:"📨 გაგრძელება Messenger-ში", footer:"კითხვები? დაგვიკავშირდით Facebook Messenger-ზე", addToCart:"კალათაში", sold:"გაყიდულია", emptyCart:"კალათა ცარიელია", sentTitle:"განაცხადი გაიგზავნა!", sentDesc:"თქვენი განაცხადი შენახულია. გააგრძელეთ Messenger-ში ხელმისაწვდომობის დასადასტურებლად.", backToShop:"გაგრძელება", searchPlaceholder:"ძებნა...", notFound:"ვერაფერი მოიძებნა", badgeNew:"ახალი", badgeSale:"ფასდაკლება", sortPriceAsc:"ფასი ↑", sortPriceDesc:"ფასი ↓", sortNew:"ახალი პირველი", namePlaceholder:"თქვენი სახელი", phonePlaceholder:"ტელეფონის ნომერი", nameRequired:"გთხოვთ შეიყვანოთ სახელი", orderMsg:"გამარჯობა! განაცხადი:\n\n{items}\n\nსულ: ₾{total}\n\nსახელი: {name}\nტელეფონი: {phone}\nID: {orderId}", linkCopied:"ბმული დაკოპირდა!", share:"გაზიარება", filterAll:"ყველა", filterWallets:"საფულეები", filterPerfume:"სუნამო", filterAccessories:"აქსესუარები", filterOther:"სხვა", cats:{wallets:"საფულეები და ჩანთები",perfume:"სუნამო და სილამაზე",accessories:"აქსესუარები",other:"სხვა"} }
+  en: { storeName:"Boutique Clearance", storeSub:"Special sale · Everything must go", cartLabel:"Items in cart", viewCart:"View Request", yourOrder:"Your Request", total:"Total", orderViaMessenger:"📨 Continue in Messenger", footer:"Questions? Write us on Facebook Messenger", addToCart:"Add to cart", sold:"Sold out", emptyCart:"Your cart is empty", sentTitle:"Request sent!", sentDesc:"Your request was saved. Please continue in Messenger so we can confirm availability.", backToShop:"Continue shopping", searchPlaceholder:"Search...", notFound:"Nothing found", badgeNew:"New", badgeSale:"Sale", sortPriceAsc:"Price ↑", sortPriceDesc:"Price ↓", sortNew:"New first", namePlaceholder:"Your name", phonePlaceholder:"Phone number", nameRequired:"Please enter your name", orderMsg:"Hello! I'd like to request:\n\n{items}\n\nTotal: ₾{total}\n\nName: {name}\nPhone: {phone}\nRequest ID: {orderId}", linkCopied:"Link copied!", share:"Share", lowStock:"Only {n} left!", confirmTitle:"Your request", confirmHint:"Your request will be saved when you open Messenger.", backBtn:"← Back", filterAll:"All", filterWallets:"Wallets", filterPerfume:"Perfume", filterAccessories:"Accessories", filterOther:"Other", cats:{wallets:"Wallets & Bags",perfume:"Perfume & Beauty",accessories:"Accessories",other:"Other"} },
+  ru: { storeName:"Распродажа", storeSub:"Специальная распродажа · Всё должно уйти", cartLabel:"Товаров в корзине", viewCart:"Смотреть заявку", yourOrder:"Ваша заявка", total:"Итого", orderViaMessenger:"📨 Продолжить в Messenger", footer:"Вопросы? Напишите нам в Facebook Messenger", addToCart:"В корзину", sold:"Продано", emptyCart:"Корзина пуста", sentTitle:"Заявка отправлена!", sentDesc:"Ваша заявка сохранена. Продолжите в Messenger — мы подтвердим наличие.", backToShop:"Продолжить покупки", searchPlaceholder:"Поиск...", notFound:"Ничего не найдено", badgeNew:"Новинка", badgeSale:"Скидка", sortPriceAsc:"по цене ↑", sortPriceDesc:"по цене ↓", sortNew:"новые сначала", namePlaceholder:"Ваше имя", phonePlaceholder:"Номер телефона", nameRequired:"Пожалуйста, введите имя", orderMsg:"Здравствуйте! Хочу оформить заявку:\n\n{items}\n\nИтого: ₾{total}\n\nИмя: {name}\nТелефон: {phone}\nID заявки: {orderId}", linkCopied:"Ссылка скопирована!", share:"Поделиться", lowStock:"Осталось {n} шт.", confirmTitle:"Ваша заявка", confirmHint:"Заявка сохранится, когда вы нажмёте кнопку Messenger.", backBtn:"← Назад", filterAll:"Все", filterWallets:"Кошельки", filterPerfume:"Духи", filterAccessories:"Аксессуары", filterOther:"Другое", cats:{wallets:"Кошельки и сумки",perfume:"Духи и красота",accessories:"Аксессуары",other:"Другое"} },
+  ge: { storeName:"გაყიდვა", storeSub:"სპეციალური გაყიდვა · ყველაფერი უნდა გაიყიდოს", cartLabel:"პროდუქტი კალათაში", viewCart:"განაცხადის ნახვა", yourOrder:"თქვენი განაცხადი", total:"სულ", orderViaMessenger:"📨 გაგრძელება Messenger-ში", footer:"კითხვები? დაგვიკავშირდით Facebook Messenger-ზე", addToCart:"კალათაში", sold:"გაყიდულია", emptyCart:"კალათა ცარიელია", sentTitle:"განაცხადი გაიგზავნა!", sentDesc:"თქვენი განაცხადი შენახულია. გააგრძელეთ Messenger-ში ხელმისაწვდომობის დასადასტურებლად.", backToShop:"გაგრძელება", searchPlaceholder:"ძებნა...", notFound:"ვერაფერი მოიძებნა", badgeNew:"ახალი", badgeSale:"ფასდაკლება", sortPriceAsc:"ფასი ↑", sortPriceDesc:"ფასი ↓", sortNew:"ახალი პირველი", namePlaceholder:"თქვენი სახელი", phonePlaceholder:"ტელეფონის ნომერი", nameRequired:"გთხოვთ შეიყვანოთ სახელი", orderMsg:"გამარჯობა! განაცხადი:\n\n{items}\n\nსულ: ₾{total}\n\nსახელი: {name}\nტელეფონი: {phone}\nID: {orderId}", linkCopied:"ბმული დაკოპირდა!", share:"გაზიარება", lowStock:"{n} ცალი დარჩა", confirmTitle:"თქვენი განაცხადი", confirmHint:"განაცხადი შეინახება Messenger-ის გახსნისას.", backBtn:"← უკან", filterAll:"ყველა", filterWallets:"საფულეები", filterPerfume:"სუნამო", filterAccessories:"აქსესუარები", filterOther:"სხვა", cats:{wallets:"საფულეები და ჩანთები",perfume:"სუნამო და სილამაზე",accessories:"აქსესუარები",other:"სხვა"} }
 };
 const CATEGORIES = [{key:"wallets",emoji:"👛"},{key:"perfume",emoji:"🌸"},{key:"accessories",emoji:"🎀"},{key:"other",emoji:"🎁"}];
 
@@ -197,6 +228,9 @@ const _allLangs = [navigator.language, ...(navigator.languages || [])].filter(Bo
 const _hasLang = prefix => _allLangs.some(l => l.startsWith(prefix));
 let lang = _hasLang('ka') ? 'ge' : _hasLang('ru') ? 'ru' : 'en';
 let cart = {}, products = [], searchQuery = '', sortMode = '', catFilter = '';
+let _pendingLead = null;
+const stockOf = p => p.stock !== undefined ? p.stock : (p.sold ? 0 : 99);
+function getPhotos(p) { return p.photos?.length ? p.photos : (p.photoUrl ? [p.photoUrl] : []); }
 
 window.setLang = l => { lang=l; document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===l)); applyT(); renderCatBar(); renderCatalog(); updateBar(); };
 const t = k => T[lang][k] || k;
@@ -207,7 +241,7 @@ function applyT() {
 
 onSnapshot(collection(db,"products"), snap => {
   products = snap.docs.map(d=>({firestoreId:d.id,...d.data()}));
-  Object.keys(cart).forEach(id => { const p=products.find(x=>x.id===id); if(p&&p.sold) delete cart[id]; });
+  Object.keys(cart).forEach(id => { const p=products.find(x=>x.id===id); if(p&&stockOf(p)<=0) delete cart[id]; });
   applyT(); renderCatBar(); renderCatalog(); updateBar();
 });
 
@@ -248,15 +282,27 @@ function renderCatalog() {
     const grid = block.querySelector(`#grid-${key}`);
     items.forEach((p,i) => {
       const card = document.createElement('div');
-      card.className='product-card'+(p.sold?' is-sold':''); card.style.animationDelay=`${i*0.05}s`; card.id=`card-${p.id}`;
-      const imgHtml = p.photoUrl ? `<img src="${p.photoUrl}" alt="" loading="lazy">` : (p.emoji||'🛍️');
+      const st = stockOf(p);
+      card.className='product-card'+(st<=0?' is-sold':''); card.style.animationDelay=`${i*0.05}s`; card.id=`card-${p.id}`;
+      const photos = getPhotos(p);
+      let imgHtml;
+      if (photos.length > 1) {
+        const safeP = encodeURIComponent(JSON.stringify(photos));
+        imgHtml = `<div class="gal-wrap" id="gal-${p.id}" data-photos="${safeP}" data-idx="0"><img src="${photos[0]}" alt="" loading="lazy" id="gal-img-${p.id}"><button class="gal-arrow gal-prev" onclick="event.stopPropagation();galNav('${p.id}',-1)">‹</button><button class="gal-arrow gal-next" onclick="event.stopPropagation();galNav('${p.id}',1)">›</button><div class="gal-dots">${photos.map((_,di)=>`<span class="gal-dot${di===0?' active':''}" id="gal-dot-${p.id}-${di}"></span>`).join('')}</div></div>`;
+      } else if (photos.length === 1) {
+        imgHtml = `<img src="${photos[0]}" alt="" loading="lazy">`;
+      } else {
+        imgHtml = p.emoji||'🛍️';
+      }
       const badgesHtml = [p.isNew?`<span class="product-badge badge-new">${t('badgeNew')}</span>`:'', p.isSale?`<span class="product-badge badge-sale">${t('badgeSale')}</span>`:''].filter(Boolean).join('');
-      card.innerHTML=`<div class="product-img">${imgHtml}${badgesHtml?`<div class="product-badges">${badgesHtml}</div>`:''}${p.sold?`<div class="sold-ribbon">${t('sold')}</div>`:''}</div>
+      const priceHtml = p.oldPrice ? `<div class="product-price"><span class="price-old">₾${p.oldPrice}</span>₾${p.price}</div>` : `<div class="product-price">₾${p.price}</div>`;
+      const stockWarn = st>0&&st<=5 ? `<div class="stock-warn">${t('lowStock').replace('{n}',st)}</div>` : '';
+      card.innerHTML=`<div class="product-img">${imgHtml}${badgesHtml?`<div class="product-badges">${badgesHtml}</div>`:''}${st<=0?`<div class="sold-ribbon">${t('sold')}</div>`:''}</div>
         <div class="product-body">
           <div class="product-sku">${p.id}</div>
           <div class="product-name">${p.name?.[lang]||p.name?.ru||''}</div>
           <div class="product-desc">${p.desc?.[lang]||p.desc?.ru||''}</div>
-          <div class="product-price">₾${p.price}</div>
+          ${priceHtml}${stockWarn}
           <button class="share-btn" onclick="event.stopPropagation();shareProduct('${p.id}')">🔗 ${t('share')}</button>
           ${ctrl(p)}</div>`;
       grid.appendChild(card);
@@ -265,13 +311,21 @@ function renderCatalog() {
 }
 
 function ctrl(p) {
-  if (p.sold) return `<button class="sold-btn">${t('sold')}</button>`;
-  const qty=cart[p.id]||0;
+  const st = stockOf(p);
+  if (st <= 0) return `<button class="sold-btn">${t('sold')}</button>`;
+  const qty = cart[p.id]||0;
+  const maxQty = p.stock !== undefined ? p.stock : 99;
   if (!qty) return `<button class="add-btn" onclick="addToCart('${p.id}')">${t('addToCart')}</button>`;
-  return `<div class="qty-control"><button class="qty-btn" onclick="changeQty('${p.id}',-1)">−</button><span class="qty-num">${qty}</span><button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button></div>`;
+  return `<div class="qty-control"><button class="qty-btn" onclick="changeQty('${p.id}',-1)">−</button><span class="qty-num">${qty}</span><button class="qty-btn" onclick="changeQty('${p.id}',1)" ${qty>=maxQty?'disabled style="opacity:0.35;cursor:default"':''}>+</button></div>`;
 }
 
-function updCard(id) { const p=products.find(x=>x.id===id),card=document.getElementById(`card-${id}`); if(!card||!p)return; card.querySelector('.product-body').innerHTML=`<div class="product-sku">${p.id}</div><div class="product-name">${p.name?.[lang]||p.name?.ru||''}</div><div class="product-desc">${p.desc?.[lang]||p.desc?.ru||''}</div><div class="product-price">₾${p.price}</div><button class="share-btn" onclick="event.stopPropagation();shareProduct('${p.id}')">🔗 ${t('share')}</button>${ctrl(p)}`; }
+function updCard(id) {
+  const p=products.find(x=>x.id===id),card=document.getElementById(`card-${id}`); if(!card||!p)return;
+  const st=stockOf(p); card.className='product-card'+(st<=0?' is-sold':'');
+  const priceHtml = p.oldPrice ? `<div class="product-price"><span class="price-old">₾${p.oldPrice}</span>₾${p.price}</div>` : `<div class="product-price">₾${p.price}</div>`;
+  const stockWarn = st>0&&st<=5 ? `<div class="stock-warn">${t('lowStock').replace('{n}',st)}</div>` : '';
+  card.querySelector('.product-body').innerHTML=`<div class="product-sku">${p.id}</div><div class="product-name">${p.name?.[lang]||p.name?.ru||''}</div><div class="product-desc">${p.desc?.[lang]||p.desc?.ru||''}</div>${priceHtml}${stockWarn}<button class="share-btn" onclick="event.stopPropagation();shareProduct('${p.id}')">🔗 ${t('share')}</button>${ctrl(p)}`;
+}
 
 window.addToCart = id => { cart[id]=1; updCard(id); updateBar(); };
 window.changeQty = (id,d) => { cart[id]=(cart[id]||0)+d; if(cart[id]<=0)delete cart[id]; updCard(id); updateBar(); };
@@ -291,34 +345,62 @@ function renderPanel() {
   document.getElementById('cartTotalVal').textContent=`₾${totalPrice()}`;
 }
 
-window.sendOrder = async () => {
-  const entries=Object.entries(cart); if(!entries.length)return;
-  const nameEl=document.getElementById('orderName');
-  const name=nameEl.value.trim();
-  if(!name){ nameEl.classList.add('error'); nameEl.focus(); setTimeout(()=>nameEl.classList.remove('error'),1200); return; }
-  const phone=document.getElementById('orderPhone').value.trim();
-  const orderItems=entries.map(([id,qty])=>{ const p=products.find(x=>x.id===id); return {id,qty,name:p?.name?.[lang]||p?.name?.ru||id,price:p?.price||0}; });
-  const orderId='ORD-'+Date.now();
-  try { await addDoc(collection(db,"orders"),{orderId,status:'messenger_pending',createdAt:serverTimestamp(),items:orderItems,total:totalPrice(),lang,customerName:name,customerPhone:phone}); } catch(e){console.error(e);}
-  const lines=orderItems.map(i=>`• [${i.id}] ${i.name} × ${i.qty} — ₾${i.price*i.qty}`).join('\n');
+// Step 1: validate → show confirmation overlay (nothing saved to Firestore yet)
+window.prepareLead = () => {
+  const entries = Object.entries(cart); if (!entries.length) return;
+  const nameEl = document.getElementById('orderName');
+  const name = nameEl.value.trim();
+  if (!name) { nameEl.classList.add('error'); nameEl.focus(); setTimeout(()=>nameEl.classList.remove('error'),1200); return; }
+  const phone = document.getElementById('orderPhone').value.trim();
+  const items = entries.map(([id,qty]) => { const p=products.find(x=>x.id===id); return {id,qty,name:p?.name?.[lang]||p?.name?.ru||id,price:p?.price||0}; });
+  const total = items.reduce((s,i)=>s+i.price*i.qty,0);
+  _pendingLead = {name,phone,items,total};
+  // Populate overlay
+  document.getElementById('confirmTitleEl').textContent = t('confirmTitle');
+  document.getElementById('confirmHintEl').textContent = t('confirmHint');
+  document.getElementById('confirmMessengerBtn').textContent = T[lang].orderViaMessenger;
+  document.getElementById('confirmBackBtn').textContent = t('backBtn');
+  document.getElementById('confirmItems').innerHTML =
+    items.map(i=>`<div class="confirm-item-row"><span class="confirm-item-name">${i.name} ×${i.qty}</span><span class="confirm-item-price">₾${i.price*i.qty}</span></div>`).join('') +
+    `<div class="confirm-total"><span>${t('total')}</span><span>₾${total}</span></div>`;
+  document.getElementById('confirmOverlay').classList.add('open');
+};
+
+// Step 2: user clicked big Messenger button → now save and open
+window.sendLead = async () => {
+  if (!_pendingLead) return;
+  closeConfirm();
+  const {name,phone,items,total} = _pendingLead;
+  _pendingLead = null;
+  const orderId = 'REQ-'+Date.now();
+  try { await addDoc(collection(db,"orders"),{orderId,status:'messenger_pending',createdAt:serverTimestamp(),items,total,lang,customerName:name,customerPhone:phone}); } catch(e){console.error(e);}
+  const lines = items.map(i=>`• [${i.id}] ${i.name} × ${i.qty} — ₾${i.price*i.qty}`).join('\n');
   if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-    const tgText = `📨 Новая заявка (Messenger)!\n\n${lines}\n\nИтого: ₾${totalPrice()}\nИмя: ${name}\nТелефон: ${phone||'—'}\nID: ${orderId}`;
-    fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({chat_id: TELEGRAM_CHAT_ID, text: tgText})
-    }).catch(()=>{});
+    const tgText = `📨 Новая заявка (Messenger)!\n\n${lines}\n\nИтого: ₾${total}\nИмя: ${name}\nТелефон: ${phone||'—'}\nID: ${orderId}`;
+    fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:TELEGRAM_CHAT_ID,text:tgText})}).catch(()=>{});
   }
-  const msg=T[lang].orderMsg.replace('{items}',lines).replace('{total}',totalPrice()).replace('{name}',name).replace('{phone}',phone||'—').replace('{orderId}',orderId);
+  const msg = T[lang].orderMsg.replace('{items}',lines).replace('{total}',total).replace('{name}',name).replace('{phone}',phone||'—').replace('{orderId}',orderId);
   window.open(`${MESSENGER_URL}?text=${encodeURIComponent(msg)}`, '_blank');
-  cart={}; nameEl.value=''; document.getElementById('orderPhone').value='';
+  cart={}; document.getElementById('orderName').value=''; document.getElementById('orderPhone').value='';
   closeCart(); updateBar(); renderCatalog();
   document.getElementById('orderSent').classList.add('show');
 };
+
+window.closeConfirm = () => { document.getElementById('confirmOverlay').classList.remove('open'); };
 window.dismissSent = () => document.getElementById('orderSent').classList.remove('show');
 document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase() === lang));
 applyT();
 renderCatBar();
+
+// ── GALLERY ──────────────────────────────────────────
+window.galNav = (id, dir) => {
+  const wrap = document.getElementById('gal-'+id); if (!wrap) return;
+  const photos = JSON.parse(decodeURIComponent(wrap.dataset.photos));
+  const idx = (parseInt(wrap.dataset.idx)+dir+photos.length)%photos.length;
+  wrap.dataset.idx = idx;
+  document.getElementById('gal-img-'+id).src = photos[idx];
+  wrap.querySelectorAll('.gal-dot').forEach((d,i)=>d.classList.toggle('active',i===idx));
+};
 
 // ── SHARE ────────────────────────────────────────────
 window.shareProduct = id => {
