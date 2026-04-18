@@ -29,9 +29,15 @@
   .order-ts { font-size:11px; color:var(--muted); }
   .order-total { font-family:'Cormorant Garamond',serif; font-size:20px; color:var(--gold); }
   .status-badge { font-size:10px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; padding:3px 10px; border-radius:20px; }
-  .status-pending { background:var(--yellow-light); color:var(--yellow); }
+  .status-pending, .status-messenger_pending { background:var(--yellow-light); color:var(--yellow); }
   .status-confirmed { background:var(--green-light); color:var(--green); }
   .status-rejected { background:var(--red-light); color:var(--red); }
+  .status-completed { background:#e8eaf6; color:#3949ab; }
+  .btn-complete { background:#3949ab; color:#fff; }
+  .orders-filter { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .filter-btn { background:none; border:1px solid var(--border); color:var(--muted); font-family:'DM Sans',sans-serif; font-size:11px; letter-spacing:0.05em; padding:5px 12px; border-radius:20px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+  .filter-btn:hover { border-color:var(--gold-light); color:var(--dark); }
+  .filter-btn.active { background:var(--dark); border-color:var(--dark); color:#fff; }
   .order-items { padding:0 18px 14px; }
   .order-item-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid var(--border); font-size:13px; gap:8px; }
   .order-item-sku { font-size:10px; color:var(--muted); letter-spacing:0.1em; background:#f7f3ee; padding:2px 6px; border-radius:2px; white-space:nowrap; }
@@ -137,7 +143,7 @@
 </div>
 <main>
   <div class="stats">
-    <div class="stat-card"><div class="stat-num" id="s-pending">—</div><div class="stat-label">Ожидают</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-pending">—</div><div class="stat-label">В Messenger</div></div>
     <div class="stat-card"><div class="stat-num" id="s-confirmed">—</div><div class="stat-label">Принято</div></div>
     <div class="stat-card"><div class="stat-num" id="s-sold">—</div><div class="stat-label">Продано</div></div>
     <div class="stat-card"><div class="stat-num" id="s-available">—</div><div class="stat-label">В наличии</div></div>
@@ -192,6 +198,7 @@ const auth = getAuth(app);
 
 let orders = [], products = [];
 let unsubOrders = null, unsubProducts = null;
+let statusFilter = '';
 
 const loginOverlay = document.getElementById('loginOverlay');
 const logoutBtn = document.getElementById('logoutBtn');
@@ -274,14 +281,20 @@ window.confirmOrder = async (firestoreId, items, orderLang, customerName) => {
   window.open(`${MESSENGER_URL}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 window.rejectOrder = async firestoreId => { await updateDoc(doc(db,"orders",firestoreId),{status:'rejected'}); };
+window.completeOrder = async firestoreId => { await updateDoc(doc(db,"orders",firestoreId),{status:'completed'}); };
+window.setStatusFilter = f => { statusFilter=f; renderOrders(); };
 window.undoOrder = async (firestoreId, status, items) => {
   if (status==='confirmed') {
     for (const item of items) {
       const p = products.find(x=>x.id===item.id);
       if (p) await updateDoc(doc(db,"products",p._id),{sold:false});
     }
+    await updateDoc(doc(db,"orders",firestoreId),{status:'messenger_pending'});
+  } else if (status==='completed') {
+    await updateDoc(doc(db,"orders",firestoreId),{status:'confirmed'});
+  } else {
+    await updateDoc(doc(db,"orders",firestoreId),{status:'messenger_pending'});
   }
-  await updateDoc(doc(db,"orders",firestoreId),{status:'pending'});
 };
 
 function fmtTime(ts) {
@@ -292,21 +305,36 @@ function fmtTime(ts) {
 
 function renderOrders() {
   const el = document.getElementById('section-orders');
-  if (!orders.length) { el.innerHTML='<div class="empty-state"><div class="icon">📭</div>Заказов пока нет</div>'; return; }
-  const sorted = [...orders].sort((a,b)=>{
-    if (a.status==='pending'&&b.status!=='pending') return -1;
-    if (b.status==='pending'&&a.status!=='pending') return 1;
-    const ta = a.createdAt?.toDate?.()?.getTime()||0, tb = b.createdAt?.toDate?.()?.getTime()||0;
-    return tb-ta;
+  const labels = {messenger_pending:'📨 Messenger',pending:'📨 Messenger',confirmed:'Принято',completed:'Выполнено',rejected:'Отклонено'};
+  const statusOrder = {messenger_pending:0,pending:0,confirmed:1,completed:2,rejected:3};
+  const filterBar = `<div class="orders-filter">
+    <button class="filter-btn${statusFilter===''?' active':''}" onclick="setStatusFilter('')">Все (${orders.length})</button>
+    <button class="filter-btn${statusFilter==='messenger_pending'?' active':''}" onclick="setStatusFilter('messenger_pending')">📨 Messenger (${orders.filter(o=>o.status==='messenger_pending'||o.status==='pending').length})</button>
+    <button class="filter-btn${statusFilter==='confirmed'?' active':''}" onclick="setStatusFilter('confirmed')">✅ Принято (${orders.filter(o=>o.status==='confirmed').length})</button>
+    <button class="filter-btn${statusFilter==='completed'?' active':''}" onclick="setStatusFilter('completed')">✔ Выполнено (${orders.filter(o=>o.status==='completed').length})</button>
+    <button class="filter-btn${statusFilter==='rejected'?' active':''}" onclick="setStatusFilter('rejected')">❌ Отклонено (${orders.filter(o=>o.status==='rejected').length})</button>
+  </div>`;
+  const displayed = statusFilter
+    ? orders.filter(o => statusFilter==='messenger_pending' ? (o.status==='messenger_pending'||o.status==='pending') : o.status===statusFilter)
+    : orders;
+  if (!displayed.length) { el.innerHTML=filterBar+'<div class="empty-state"><div class="icon">📭</div>Заявок нет</div>'; return; }
+  const sorted = [...displayed].sort((a,b)=>{
+    const sa=statusOrder[a.status]??4, sb=statusOrder[b.status]??4;
+    if (sa!==sb) return sa-sb;
+    return (b.createdAt?.toDate?.()?.getTime()||0)-(a.createdAt?.toDate?.()?.getTime()||0);
   });
-  const labels = {pending:'Ожидает',confirmed:'Принято',rejected:'Отклонено'};
-  el.innerHTML = sorted.map(o => {
+  el.innerHTML = filterBar + sorted.map(o => {
     const itemsHtml = (o.items||[]).map(i=>`<div class="order-item-row"><span class="order-item-sku">${i.id}</span><span class="order-item-name">${i.name}</span><span style="color:var(--muted);font-size:12px">×${i.qty}</span><span class="order-item-price">₾${i.price*i.qty}</span></div>`).join('');
     const itemsJson = encodeURIComponent(JSON.stringify(o.items||[]));
     const safeName = (o.customerName||'').replace(/'/g,"\\'");
-    const actions = o.status==='pending'
-      ? `<button class="btn btn-accept" onclick="confirmOrder('${o._id}',JSON.parse(decodeURIComponent('${itemsJson}')),'${o.lang||''}','${safeName}')">✅ Принять</button><button class="btn btn-reject" onclick="rejectOrder('${o._id}')">❌ Отклонить</button>`
-      : `<button class="btn btn-undo" onclick="undoOrder('${o._id}','${o.status}',JSON.parse(decodeURIComponent('${itemsJson}')))">↩ Отменить</button>`;
+    let actions;
+    if (o.status==='messenger_pending'||o.status==='pending') {
+      actions = `<button class="btn btn-accept" onclick="confirmOrder('${o._id}',JSON.parse(decodeURIComponent('${itemsJson}')),'${o.lang||''}','${safeName}')">✅ Принять</button><button class="btn btn-reject" onclick="rejectOrder('${o._id}')">❌ Отклонить</button>`;
+    } else if (o.status==='confirmed') {
+      actions = `<button class="btn btn-complete" onclick="completeOrder('${o._id}')">✔ Выполнен</button><button class="btn btn-undo" onclick="undoOrder('${o._id}','${o.status}',JSON.parse(decodeURIComponent('${itemsJson}')))">↩ Отменить</button>`;
+    } else {
+      actions = `<button class="btn btn-undo" onclick="undoOrder('${o._id}','${o.status}',JSON.parse(decodeURIComponent('${itemsJson}')))">↩ Отменить</button>`;
+    }
     const customerInfo = o.customerName ? `<div class="order-ts">${o.customerName}${o.customerPhone?' · '+o.customerPhone:''}</div>` : '';
     return `<div class="order-card">
       <div class="order-header"><div><div class="order-id">${o.orderId||o._id}</div><div class="order-ts">${fmtTime(o.createdAt)}</div>${customerInfo}</div><span class="status-badge status-${o.status}">${labels[o.status]||o.status}</span><div class="order-total">₾${o.total}</div></div>
@@ -335,7 +363,7 @@ function renderInventory() {
 
 // ── STATS ─────────────────────────────────────────────
 function renderStats() {
-  const pending = orders.filter(o=>o.status==='pending').length;
+  const pending = orders.filter(o=>o.status==='messenger_pending'||o.status==='pending').length;
   const confirmed = orders.filter(o=>o.status==='confirmed').length;
   const sold = products.filter(p=>p.sold).length;
   document.getElementById('s-pending').textContent = pending;
