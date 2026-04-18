@@ -254,14 +254,105 @@ window.setSort = mode => {
 };
 window.setCatFilter = key => { catFilter = catFilter===key ? '' : key; renderCatBar(); renderCatalog(); };
 function renderCatBar() {
+  const bar = document.getElementById('catBar');
+  bar.textContent = '';
   const filters = [{key:'',tKey:'filterAll'},{key:'wallets',tKey:'filterWallets'},{key:'perfume',tKey:'filterPerfume'},{key:'accessories',tKey:'filterAccessories'},{key:'other',tKey:'filterOther'}];
-  document.getElementById('catBar').innerHTML = filters.map(f=>`<button class="cat-btn${catFilter===f.key?' active':''}" onclick="setCatFilter('${f.key}')">${t(f.tKey)}</button>`).join('');
+  filters.forEach(f => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-btn' + (catFilter===f.key?' active':'');
+    btn.textContent = t(f.tKey);
+    btn.addEventListener('click', () => setCatFilter(f.key));
+    bar.appendChild(btn);
+  });
 }
 function applySorting(arr) {
   if (sortMode==='price-asc') return [...arr].sort((a,b)=>a.price-b.price);
   if (sortMode==='price-desc') return [...arr].sort((a,b)=>b.price-a.price);
   if (sortMode==='new') return [...arr].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   return arr;
+}
+
+// ── DOM BUILDERS ─────────────────────────────────────
+function buildProductImg(p) {
+  const imgDiv = document.createElement('div');
+  imgDiv.className = 'product-img';
+  const st = stockOf(p);
+  const photos = getPhotos(p);
+  if (photos.length > 1) {
+    const galWrap = document.createElement('div');
+    galWrap.className = 'gal-wrap';
+    galWrap.id = 'gal-' + p.id;
+    galWrap.dataset.photos = encodeURIComponent(JSON.stringify(photos));
+    galWrap.dataset.idx = '0';
+    const img = document.createElement('img');
+    img.src = photos[0]; img.alt = ''; img.loading = 'lazy'; img.id = 'gal-img-' + p.id;
+    const prev = document.createElement('button');
+    prev.className = 'gal-arrow gal-prev'; prev.textContent = '‹';
+    prev.addEventListener('click', e => { e.stopPropagation(); galNav(p.id, -1); });
+    const next = document.createElement('button');
+    next.className = 'gal-arrow gal-next'; next.textContent = '›';
+    next.addEventListener('click', e => { e.stopPropagation(); galNav(p.id, 1); });
+    const dots = document.createElement('div'); dots.className = 'gal-dots';
+    photos.forEach((_, di) => {
+      const dot = document.createElement('span');
+      dot.className = 'gal-dot' + (di===0?' active':'');
+      dot.id = 'gal-dot-' + p.id + '-' + di;
+      dots.appendChild(dot);
+    });
+    galWrap.append(img, prev, next, dots);
+    imgDiv.appendChild(galWrap);
+  } else if (photos.length === 1) {
+    const img = document.createElement('img');
+    img.src = photos[0]; img.alt = ''; img.loading = 'lazy';
+    imgDiv.appendChild(img);
+  } else {
+    imgDiv.textContent = p.emoji || '🛍️';
+  }
+  if (p.isNew || p.isSale) {
+    const badgesDiv = document.createElement('div'); badgesDiv.className = 'product-badges';
+    if (p.isNew) { const b=document.createElement('span'); b.className='product-badge badge-new'; b.textContent=t('badgeNew'); badgesDiv.appendChild(b); }
+    if (p.isSale) { const b=document.createElement('span'); b.className='product-badge badge-sale'; b.textContent=t('badgeSale'); badgesDiv.appendChild(b); }
+    imgDiv.appendChild(badgesDiv);
+  }
+  if (st <= 0) { const r=document.createElement('div'); r.className='sold-ribbon'; r.textContent=t('sold'); imgDiv.appendChild(r); }
+  return imgDiv;
+}
+
+function buildCtrl(p) {
+  const st = stockOf(p);
+  if (st <= 0) { const btn=document.createElement('button'); btn.className='sold-btn'; btn.textContent=t('sold'); return btn; }
+  const qty = cart[p.id]||0;
+  const maxQty = p.stock !== undefined ? p.stock : 99;
+  if (!qty) {
+    const btn=document.createElement('button'); btn.className='add-btn'; btn.textContent=t('addToCart');
+    btn.addEventListener('click', () => addToCart(p.id)); return btn;
+  }
+  const div=document.createElement('div'); div.className='qty-control';
+  const minus=document.createElement('button'); minus.className='qty-btn'; minus.textContent='−';
+  minus.addEventListener('click', () => changeQty(p.id,-1));
+  const num=document.createElement('span'); num.className='qty-num'; num.textContent=qty;
+  const plus=document.createElement('button'); plus.className='qty-btn'; plus.textContent='+';
+  if (qty>=maxQty) { plus.disabled=true; plus.style.opacity='0.35'; plus.style.cursor='default'; }
+  plus.addEventListener('click', () => changeQty(p.id,1));
+  div.append(minus,num,plus); return div;
+}
+
+function buildProductBody(p) {
+  const st = stockOf(p);
+  const body=document.createElement('div'); body.className='product-body';
+  const sku=document.createElement('div'); sku.className='product-sku'; sku.textContent=p.id;
+  const name=document.createElement('div'); name.className='product-name'; name.textContent=p.name?.[lang]||p.name?.ru||'';
+  const desc=document.createElement('div'); desc.className='product-desc'; desc.textContent=p.desc?.[lang]||p.desc?.ru||'';
+  const priceDiv=document.createElement('div'); priceDiv.className='product-price';
+  if (p.oldPrice) { const s=document.createElement('span'); s.className='price-old'; s.textContent='₾'+p.oldPrice; priceDiv.appendChild(s); }
+  priceDiv.append('₾'+p.price);
+  body.append(sku,name,desc,priceDiv);
+  if (st>0&&st<=5) { const w=document.createElement('div'); w.className='stock-warn'; w.textContent=t('lowStock').replace('{n}',st); body.appendChild(w); }
+  const shareBtn=document.createElement('button'); shareBtn.className='share-btn';
+  shareBtn.textContent='🔗 '+t('share');
+  shareBtn.addEventListener('click', e=>{e.stopPropagation(); shareProduct(p.id);});
+  body.append(shareBtn, buildCtrl(p));
+  return body;
 }
 
 function renderCatalog() {
@@ -283,48 +374,22 @@ function renderCatalog() {
     items.forEach((p,i) => {
       const card = document.createElement('div');
       const st = stockOf(p);
-      card.className='product-card'+(st<=0?' is-sold':''); card.style.animationDelay=`${i*0.05}s`; card.id=`card-${p.id}`;
-      const photos = getPhotos(p);
-      let imgHtml;
-      if (photos.length > 1) {
-        const safeP = encodeURIComponent(JSON.stringify(photos));
-        imgHtml = `<div class="gal-wrap" id="gal-${p.id}" data-photos="${safeP}" data-idx="0"><img src="${photos[0]}" alt="" loading="lazy" id="gal-img-${p.id}"><button class="gal-arrow gal-prev" onclick="event.stopPropagation();galNav('${p.id}',-1)">‹</button><button class="gal-arrow gal-next" onclick="event.stopPropagation();galNav('${p.id}',1)">›</button><div class="gal-dots">${photos.map((_,di)=>`<span class="gal-dot${di===0?' active':''}" id="gal-dot-${p.id}-${di}"></span>`).join('')}</div></div>`;
-      } else if (photos.length === 1) {
-        imgHtml = `<img src="${photos[0]}" alt="" loading="lazy">`;
-      } else {
-        imgHtml = p.emoji||'🛍️';
-      }
-      const badgesHtml = [p.isNew?`<span class="product-badge badge-new">${t('badgeNew')}</span>`:'', p.isSale?`<span class="product-badge badge-sale">${t('badgeSale')}</span>`:''].filter(Boolean).join('');
-      const priceHtml = p.oldPrice ? `<div class="product-price"><span class="price-old">₾${p.oldPrice}</span>₾${p.price}</div>` : `<div class="product-price">₾${p.price}</div>`;
-      const stockWarn = st>0&&st<=5 ? `<div class="stock-warn">${t('lowStock').replace('{n}',st)}</div>` : '';
-      card.innerHTML=`<div class="product-img">${imgHtml}${badgesHtml?`<div class="product-badges">${badgesHtml}</div>`:''}${st<=0?`<div class="sold-ribbon">${t('sold')}</div>`:''}</div>
-        <div class="product-body">
-          <div class="product-sku">${p.id}</div>
-          <div class="product-name">${p.name?.[lang]||p.name?.ru||''}</div>
-          <div class="product-desc">${p.desc?.[lang]||p.desc?.ru||''}</div>
-          ${priceHtml}${stockWarn}
-          <button class="share-btn" onclick="event.stopPropagation();shareProduct('${p.id}')">🔗 ${t('share')}</button>
-          ${ctrl(p)}</div>`;
+      card.className='product-card'+(st<=0?' is-sold':'');
+      card.style.animationDelay=`${i*0.05}s`;
+      card.id='card-'+p.id;
+      card.appendChild(buildProductImg(p));
+      card.appendChild(buildProductBody(p));
       grid.appendChild(card);
     });
   });
 }
 
-function ctrl(p) {
-  const st = stockOf(p);
-  if (st <= 0) return `<button class="sold-btn">${t('sold')}</button>`;
-  const qty = cart[p.id]||0;
-  const maxQty = p.stock !== undefined ? p.stock : 99;
-  if (!qty) return `<button class="add-btn" onclick="addToCart('${p.id}')">${t('addToCart')}</button>`;
-  return `<div class="qty-control"><button class="qty-btn" onclick="changeQty('${p.id}',-1)">−</button><span class="qty-num">${qty}</span><button class="qty-btn" onclick="changeQty('${p.id}',1)" ${qty>=maxQty?'disabled style="opacity:0.35;cursor:default"':''}>+</button></div>`;
-}
-
 function updCard(id) {
-  const p=products.find(x=>x.id===id),card=document.getElementById(`card-${id}`); if(!card||!p)return;
-  const st=stockOf(p); card.className='product-card'+(st<=0?' is-sold':'');
-  const priceHtml = p.oldPrice ? `<div class="product-price"><span class="price-old">₾${p.oldPrice}</span>₾${p.price}</div>` : `<div class="product-price">₾${p.price}</div>`;
-  const stockWarn = st>0&&st<=5 ? `<div class="stock-warn">${t('lowStock').replace('{n}',st)}</div>` : '';
-  card.querySelector('.product-body').innerHTML=`<div class="product-sku">${p.id}</div><div class="product-name">${p.name?.[lang]||p.name?.ru||''}</div><div class="product-desc">${p.desc?.[lang]||p.desc?.ru||''}</div>${priceHtml}${stockWarn}<button class="share-btn" onclick="event.stopPropagation();shareProduct('${p.id}')">🔗 ${t('share')}</button>${ctrl(p)}`;
+  const p=products.find(x=>x.id===id), card=document.getElementById('card-'+id);
+  if (!card||!p) return;
+  card.className='product-card'+(stockOf(p)<=0?' is-sold':'');
+  const oldBody=card.querySelector('.product-body');
+  if (oldBody) card.replaceChild(buildProductBody(p), oldBody);
 }
 
 window.addToCart = id => { cart[id]=1; updCard(id); updateBar(); };
@@ -339,9 +404,30 @@ window.openCart = () => { renderPanel(); document.getElementById('cartOverlay').
 window.closeCart = () => { document.getElementById('cartOverlay').classList.remove('open'); document.getElementById('cartPanel').classList.remove('open'); };
 
 function renderPanel() {
-  const list=document.getElementById('cartItemsList'), entries=Object.entries(cart);
-  if (!entries.length) { list.innerHTML=`<div class="empty-cart"><div class="big">🛒</div>${t('emptyCart')}</div>`; document.getElementById('cartTotalVal').textContent='₾0'; return; }
-  list.innerHTML=entries.map(([id,qty])=>{ const p=products.find(x=>x.id===id); if(!p)return''; return `<div class="cart-item"><div class="cart-item-emoji">${p.emoji||'🛍️'}</div><div class="cart-item-info"><div class="cart-item-sku">${p.id}</div><div class="cart-item-name">${p.name?.[lang]||p.name?.ru||''}</div><div class="cart-item-price">₾${p.price} × ${qty} = ₾${p.price*qty}</div></div><button class="cart-item-remove" onclick="removeFromCart('${p.id}')">✕</button></div>`; }).join('');
+  const list=document.getElementById('cartItemsList');
+  const entries=Object.entries(cart);
+  list.textContent='';
+  if (!entries.length) {
+    const empty=document.createElement('div'); empty.className='empty-cart';
+    const icon=document.createElement('div'); icon.className='big'; icon.textContent='🛒';
+    empty.append(icon, t('emptyCart'));
+    list.appendChild(empty);
+    document.getElementById('cartTotalVal').textContent='₾0'; return;
+  }
+  entries.forEach(([id,qty]) => {
+    const p=products.find(x=>x.id===id); if(!p) return;
+    const item=document.createElement('div'); item.className='cart-item';
+    const emojiDiv=document.createElement('div'); emojiDiv.className='cart-item-emoji'; emojiDiv.textContent=p.emoji||'🛍️';
+    const info=document.createElement('div'); info.className='cart-item-info';
+    const sku=document.createElement('div'); sku.className='cart-item-sku'; sku.textContent=p.id;
+    const nm=document.createElement('div'); nm.className='cart-item-name'; nm.textContent=p.name?.[lang]||p.name?.ru||'';
+    const pr=document.createElement('div'); pr.className='cart-item-price'; pr.textContent=`₾${p.price} × ${qty} = ₾${p.price*qty}`;
+    info.append(sku,nm,pr);
+    const rm=document.createElement('button'); rm.className='cart-item-remove'; rm.textContent='✕';
+    rm.addEventListener('click', ()=>removeFromCart(p.id));
+    item.append(emojiDiv,info,rm);
+    list.appendChild(item);
+  });
   document.getElementById('cartTotalVal').textContent=`₾${totalPrice()}`;
 }
 
@@ -360,9 +446,18 @@ window.prepareLead = () => {
   document.getElementById('confirmHintEl').textContent = t('confirmHint');
   document.getElementById('confirmMessengerBtn').textContent = T[lang].orderViaMessenger;
   document.getElementById('confirmBackBtn').textContent = t('backBtn');
-  document.getElementById('confirmItems').innerHTML =
-    items.map(i=>`<div class="confirm-item-row"><span class="confirm-item-name">${i.name} ×${i.qty}</span><span class="confirm-item-price">₾${i.price*i.qty}</span></div>`).join('') +
-    `<div class="confirm-total"><span>${t('total')}</span><span>₾${total}</span></div>`;
+  const ci=document.getElementById('confirmItems');
+  ci.textContent='';
+  items.forEach(i=>{
+    const row=document.createElement('div'); row.className='confirm-item-row';
+    const n=document.createElement('span'); n.className='confirm-item-name'; n.textContent=i.name+' ×'+i.qty;
+    const pr=document.createElement('span'); pr.className='confirm-item-price'; pr.textContent='₾'+(i.price*i.qty);
+    row.append(n,pr); ci.appendChild(row);
+  });
+  const totalRow=document.createElement('div'); totalRow.className='confirm-total';
+  const tl=document.createElement('span'); tl.textContent=t('total');
+  const tv=document.createElement('span'); tv.textContent='₾'+total;
+  totalRow.append(tl,tv); ci.appendChild(totalRow);
   document.getElementById('confirmOverlay').classList.add('open');
 };
 

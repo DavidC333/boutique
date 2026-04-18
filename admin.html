@@ -342,9 +342,10 @@ function renderOrders() {
     const itemsHtml = (o.items||[]).map(i=>`<div class="order-item-row"><span class="order-item-sku">${escapeHtml(i.id)}</span><span class="order-item-name">${escapeHtml(i.name)}</span><span style="color:var(--muted);font-size:12px">×${i.qty}</span><span class="order-item-price">₾${i.price*i.qty}</span></div>`).join('');
     const itemsJson = encodeURIComponent(JSON.stringify(o.items||[]));
     const encodedName = encodeURIComponent(o.customerName||'');
+    const encodedLang = encodeURIComponent(o.lang||'ge');
     let actions;
     if (o.status==='messenger_pending'||o.status==='pending') {
-      actions = `<button class="btn btn-accept" onclick="confirmOrder('${o._id}',JSON.parse(decodeURIComponent('${itemsJson}')),'${o.lang||''}',decodeURIComponent('${encodedName}'))">✅ Принять</button><button class="btn btn-reject" onclick="rejectOrder('${o._id}')">❌ Отклонить</button>`;
+      actions = `<button class="btn btn-accept" onclick="confirmOrder('${o._id}',JSON.parse(decodeURIComponent('${itemsJson}')),decodeURIComponent('${encodedLang}'),decodeURIComponent('${encodedName}'))">✅ Принять</button><button class="btn btn-reject" onclick="rejectOrder('${o._id}')">❌ Отклонить</button>`;
     } else if (o.status==='confirmed') {
       actions = `<button class="btn btn-complete" onclick="completeOrder('${o._id}')">✔ Выполнен</button><button class="btn btn-undo" onclick="undoOrder('${o._id}','${o.status}',JSON.parse(decodeURIComponent('${itemsJson}')))">↩ Отменить</button>`;
     } else {
@@ -365,23 +366,45 @@ window.deleteProduct = async (firestoreId, name) => { if(confirm(`Удалить
 function renderInventory() {
   const grid = document.getElementById('inventoryGrid');
   if (!products.length) { grid.innerHTML='<div class="empty-state"><div class="icon">📦</div>Товаров нет. Добавьте первый!</div>'; return; }
-  grid.innerHTML = products.map(p=>{
+  grid.textContent='';
+  products.forEach(p => {
     const st = stockOf(p);
-    const stockCtrl = `<div class="stock-ctrl">
-      <button class="qty-btn-sm" onclick="adjustStock('${p._id}',-1)">−</button>
-      <span class="stock-num${st<=3?' low':''}">${st}</span>
-      <button class="qty-btn-sm" onclick="adjustStock('${p._id}',1)">+</button>
-    </div>`;
-    const priceStr = p.oldPrice ? `₾${p.price} <s style="color:var(--muted);font-size:11px">₾${p.oldPrice}</s>` : `₾${p.price}`;
-    return `<div class="inv-card${st<=0?' is-sold':''}">
-    <div class="inv-emoji">${p.emoji||'🛍️'}</div>
-    <div class="inv-info"><div class="inv-sku">${p.id}</div><div class="inv-name">${p.name?.ru||''}</div><div class="inv-price">${priceStr}</div></div>
-    <div class="inv-flags">${p.isNew?'🆕':''}${p.isSale?'🏷️':''}</div>
-    ${stockCtrl}
-    <button class="inv-edit" onclick="openEditModal('${p._id}')" title="Редактировать">✏️</button>
-    <button class="inv-delete" onclick="deleteProduct('${p._id}','${(p.name?.ru||'').replace(/'/g,"\\'")}')">🗑</button>
-  </div>`;
-  }).join('');
+    const card = document.createElement('div');
+    card.className = 'inv-card' + (st<=0?' is-sold':'');
+
+    const emojiEl = document.createElement('div'); emojiEl.className='inv-emoji'; emojiEl.textContent=p.emoji||'🛍️';
+
+    const info = document.createElement('div'); info.className='inv-info';
+    const skuEl = document.createElement('div'); skuEl.className='inv-sku'; skuEl.textContent=p.id;
+    const nameEl = document.createElement('div'); nameEl.className='inv-name'; nameEl.textContent=p.name?.ru||'';
+    const priceEl = document.createElement('div'); priceEl.className='inv-price';
+    priceEl.textContent='₾'+p.price;
+    if (p.oldPrice) {
+      const s=document.createElement('s'); s.style.cssText='color:var(--muted);font-size:11px;margin-left:4px';
+      s.textContent='₾'+p.oldPrice; priceEl.appendChild(s);
+    }
+    info.append(skuEl,nameEl,priceEl);
+
+    const flags = document.createElement('div'); flags.className='inv-flags';
+    if (p.isNew) flags.append('🆕');
+    if (p.isSale) flags.append('🏷️');
+
+    const stockCtrl = document.createElement('div'); stockCtrl.className='stock-ctrl';
+    const minus=document.createElement('button'); minus.className='qty-btn-sm'; minus.textContent='−';
+    minus.addEventListener('click', ()=>adjustStock(p._id,-1));
+    const stockNum=document.createElement('span'); stockNum.className='stock-num'+(st<=3?' low':''); stockNum.textContent=st;
+    const plus=document.createElement('button'); plus.className='qty-btn-sm'; plus.textContent='+';
+    plus.addEventListener('click', ()=>adjustStock(p._id,1));
+    stockCtrl.append(minus,stockNum,plus);
+
+    const editBtn=document.createElement('button'); editBtn.className='inv-edit'; editBtn.title='Редактировать'; editBtn.textContent='✏️';
+    editBtn.addEventListener('click', ()=>openEditModal(p._id));
+    const delBtn=document.createElement('button'); delBtn.className='inv-delete'; delBtn.textContent='🗑';
+    delBtn.addEventListener('click', ()=>deleteProduct(p._id, p.name?.ru||''));
+
+    card.append(emojiEl,info,flags,stockCtrl,editBtn,delBtn);
+    grid.appendChild(card);
+  });
 }
 
 // ── STATS ─────────────────────────────────────────────
