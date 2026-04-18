@@ -203,8 +203,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebas
 import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const MESSENGER_URL = "https://www.messenger.com/e2ee/t/1192818532433919";
-const TELEGRAM_BOT_TOKEN = "8775998482:AAFKKL9mXMOh8sOqOHN_aQxYLhr6m6lN6pc";
-const TELEGRAM_CHAT_ID = "1039426103";
+const NOTIFY_WEBHOOK = "https://YOUR_WEBHOOK_URL_HERE"; // замени на реальный URL
 
 const firebaseConfig = {
   apiKey: "AIzaSyDsr51JFbm2HxwhorkUHnfVWOXRr5r4iy0",
@@ -470,9 +469,12 @@ window.sendLead = async () => {
   const orderId = 'REQ-'+Date.now();
   try { await addDoc(collection(db,"orders"),{orderId,status:'messenger_pending',createdAt:serverTimestamp(),items,total,lang,customerName:name,customerPhone:phone}); } catch(e){console.error(e);}
   const lines = items.map(i=>`• [${i.id}] ${i.name} × ${i.qty} — ₾${i.price*i.qty}`).join('\n');
-  if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-    const tgText = `📨 Новая заявка (Messenger)!\n\n${lines}\n\nИтого: ₾${total}\nИмя: ${name}\nТелефон: ${phone||'—'}\nID: ${orderId}`;
-    fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:TELEGRAM_CHAT_ID,text:tgText})}).catch(()=>{});
+  if (NOTIFY_WEBHOOK && !NOTIFY_WEBHOOK.includes('YOUR_WEBHOOK')) {
+    fetch(NOTIFY_WEBHOOK, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({orderId, items, total, customerName:name, customerPhone:phone||'', lang})
+    }).catch(()=>{});
   }
   const msg = T[lang].orderMsg.replace('{items}',lines).replace('{total}',total).replace('{name}',name).replace('{phone}',phone||'—').replace('{orderId}',orderId);
   window.open(`${MESSENGER_URL}?text=${encodeURIComponent(msg)}`, '_blank');
