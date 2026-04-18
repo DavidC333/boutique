@@ -48,6 +48,11 @@
   .add-btn { width:100%; padding:9px; background:var(--dark); color:var(--cream); border:none; font-family:'DM Sans',sans-serif; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; transition:background 0.2s; margin-top:10px; border-radius:2px; }
   .add-btn:hover { background:var(--gold); }
   .sold-btn { width:100%; padding:9px; background:#eee; color:var(--muted); border:none; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; margin-top:10px; border-radius:2px; cursor:default; }
+  .share-btn { background:none; border:none; color:var(--muted); font-size:13px; cursor:pointer; padding:4px 0; transition:color 0.2s; display:inline-flex; align-items:center; gap:5px; font-family:'DM Sans',sans-serif; letter-spacing:0.04em; }
+  .share-btn:hover { color:var(--gold); }
+  .toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--dark); color:#fff; font-family:'DM Sans',sans-serif; font-size:13px; padding:10px 22px; border-radius:8px; opacity:0; pointer-events:none; transition:opacity 0.3s,transform 0.3s; z-index:400; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .product-card.highlight { border-color:var(--gold); box-shadow:0 0 0 2px var(--gold); }
   .qty-control { display:flex; align-items:center; justify-content:space-between; margin-top:10px; background:#f7f3ee; border-radius:2px; }
   .qty-btn { background:none; border:none; width:34px; height:34px; font-size:18px; cursor:pointer; color:var(--dark); }
   .qty-btn:hover { background:var(--border); }
@@ -153,6 +158,7 @@
   <button onclick="dismissSent()" data-t="backToShop"></button>
 </div>
 
+<div class="toast" id="toast"></div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
@@ -171,9 +177,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const T = {
-  en: { storeName:"Boutique Clearance", storeSub:"Special sale · Everything must go", cartLabel:"Items in cart", viewCart:"View Order", yourOrder:"Your Order", total:"Total", orderViaMessenger:"📨 Send order via Messenger", footer:"Questions? Write us on Facebook Messenger", addToCart:"Add to cart", sold:"Sold out", emptyCart:"Your cart is empty", sentTitle:"Order sent!", sentDesc:"We'll confirm your order via Messenger shortly.", backToShop:"Continue shopping", searchPlaceholder:"Search...", notFound:"Nothing found", badgeNew:"New", badgeSale:"Sale", sortPriceAsc:"Price ↑", sortPriceDesc:"Price ↓", sortNew:"New first", namePlaceholder:"Your name", phonePlaceholder:"Phone number", nameRequired:"Please enter your name", orderMsg:"Hello! I would like to order:\n\n{items}\n\nTotal: ₾{total}\n\nName: {name}\nPhone: {phone}\nOrder ID: {orderId}", cats:{wallets:"Wallets & Bags",perfume:"Perfume & Beauty",accessories:"Accessories",other:"Other"} },
-  ru: { storeName:"Распродажа", storeSub:"Специальная распродажа · Всё должно уйти", cartLabel:"Товаров в корзине", viewCart:"Смотреть заказ", yourOrder:"Ваш заказ", total:"Итого", orderViaMessenger:"📨 Отправить заказ через Messenger", footer:"Вопросы? Напишите нам в Facebook Messenger", addToCart:"В корзину", sold:"Продано", emptyCart:"Корзина пуста", sentTitle:"Заказ отправлен!", sentDesc:"Мы подтвердим ваш заказ в Messenger в ближайшее время.", backToShop:"Продолжить покупки", searchPlaceholder:"Поиск...", notFound:"Ничего не найдено", badgeNew:"Новинка", badgeSale:"Скидка", sortPriceAsc:"по цене ↑", sortPriceDesc:"по цене ↓", sortNew:"новые сначала", namePlaceholder:"Ваше имя", phonePlaceholder:"Номер телефона", nameRequired:"Пожалуйста, введите имя", orderMsg:"Здравствуйте! Я хотел бы заказать:\n\n{items}\n\nИтого: ₾{total}\n\nИмя: {name}\nТелефон: {phone}\nID заказа: {orderId}", cats:{wallets:"Кошельки и сумки",perfume:"Духи и красота",accessories:"Аксессуары",other:"Другое"} },
-  ge: { storeName:"გაყიდვა", storeSub:"სპეციალური გაყიდვა · ყველაფერი უნდა გაიყიდოს", cartLabel:"პროდუქტი კალათაში", viewCart:"შეკვეთის ნახვა", yourOrder:"თქვენი შეკვეთა", total:"სულ", orderViaMessenger:"📨 შეკვეთის გაგზავნა Messenger-ით", footer:"კითხვები? დაგვიკავშირდით Facebook Messenger-ზე", addToCart:"კალათაში", sold:"გაყიდულია", emptyCart:"კალათა ცარიელია", sentTitle:"შეკვეთა გაიგზავნა!", sentDesc:"მალე დაგიდასტურებთ Messenger-ში.", backToShop:"გაგრძელება", searchPlaceholder:"ძებნა...", notFound:"ვერაფერი მოიძებნა", badgeNew:"ახალი", badgeSale:"ფასდაკლება", sortPriceAsc:"ფასი ↑", sortPriceDesc:"ფასი ↓", sortNew:"ახალი პირველი", namePlaceholder:"თქვენი სახელი", phonePlaceholder:"ტელეფონის ნომერი", nameRequired:"გთხოვთ შეიყვანოთ სახელი", orderMsg:"გამარჯობა! მე მინდა შევუკვეთო:\n\n{items}\n\nსულ: ₾{total}\n\nსახელი: {name}\nტელეფონი: {phone}\nშეკვეთის ID: {orderId}", cats:{wallets:"საფულეები და ჩანთები",perfume:"სუნამო და სილამაზე",accessories:"აქსესუარები",other:"სხვა"} }
+  en: { storeName:"Boutique Clearance", storeSub:"Special sale · Everything must go", cartLabel:"Items in cart", viewCart:"View Order", yourOrder:"Your Order", total:"Total", orderViaMessenger:"📨 Send order via Messenger", footer:"Questions? Write us on Facebook Messenger", addToCart:"Add to cart", sold:"Sold out", emptyCart:"Your cart is empty", sentTitle:"Order sent!", sentDesc:"We'll confirm your order via Messenger shortly.", backToShop:"Continue shopping", searchPlaceholder:"Search...", notFound:"Nothing found", badgeNew:"New", badgeSale:"Sale", sortPriceAsc:"Price ↑", sortPriceDesc:"Price ↓", sortNew:"New first", namePlaceholder:"Your name", phonePlaceholder:"Phone number", nameRequired:"Please enter your name", orderMsg:"Hello! I would like to order:\n\n{items}\n\nTotal: ₾{total}\n\nName: {name}\nPhone: {phone}\nOrder ID: {orderId}", linkCopied:"Link copied!", share:"Share", cats:{wallets:"Wallets & Bags",perfume:"Perfume & Beauty",accessories:"Accessories",other:"Other"} },
+  ru: { storeName:"Распродажа", storeSub:"Специальная распродажа · Всё должно уйти", cartLabel:"Товаров в корзине", viewCart:"Смотреть заказ", yourOrder:"Ваш заказ", total:"Итого", orderViaMessenger:"📨 Отправить заказ через Messenger", footer:"Вопросы? Напишите нам в Facebook Messenger", addToCart:"В корзину", sold:"Продано", emptyCart:"Корзина пуста", sentTitle:"Заказ отправлен!", sentDesc:"Мы подтвердим ваш заказ в Messenger в ближайшее время.", backToShop:"Продолжить покупки", searchPlaceholder:"Поиск...", notFound:"Ничего не найдено", badgeNew:"Новинка", badgeSale:"Скидка", sortPriceAsc:"по цене ↑", sortPriceDesc:"по цене ↓", sortNew:"новые сначала", namePlaceholder:"Ваше имя", phonePlaceholder:"Номер телефона", nameRequired:"Пожалуйста, введите имя", orderMsg:"Здравствуйте! Я хотел бы заказать:\n\n{items}\n\nИтого: ₾{total}\n\nИмя: {name}\nТелефон: {phone}\nID заказа: {orderId}", linkCopied:"Ссылка скопирована!", share:"Поделиться", cats:{wallets:"Кошельки и сумки",perfume:"Духи и красота",accessories:"Аксессуары",other:"Другое"} },
+  ge: { storeName:"გაყიდვა", storeSub:"სპეციალური გაყიდვა · ყველაფერი უნდა გაიყიდოს", cartLabel:"პროდუქტი კალათაში", viewCart:"შეკვეთის ნახვა", yourOrder:"თქვენი შეკვეთა", total:"სულ", orderViaMessenger:"📨 შეკვეთის გაგზავნა Messenger-ით", footer:"კითხვები? დაგვიკავშირდით Facebook Messenger-ზე", addToCart:"კალათაში", sold:"გაყიდულია", emptyCart:"კალათა ცარიელია", sentTitle:"შეკვეთა გაიგზავნა!", sentDesc:"მალე დაგიდასტურებთ Messenger-ში.", backToShop:"გაგრძელება", searchPlaceholder:"ძებნა...", notFound:"ვერაფერი მოიძებნა", badgeNew:"ახალი", badgeSale:"ფასდაკლება", sortPriceAsc:"ფასი ↑", sortPriceDesc:"ფასი ↓", sortNew:"ახალი პირველი", namePlaceholder:"თქვენი სახელი", phonePlaceholder:"ტელეფონის ნომერი", nameRequired:"გთხოვთ შეიყვანოთ სახელი", orderMsg:"გამარჯობა! მე მინდა შევუკვეთო:\n\n{items}\n\nსულ: ₾{total}\n\nსახელი: {name}\nტელეფონი: {phone}\nშეკვეთის ID: {orderId}", linkCopied:"ბმული დაკოპირდა!", share:"გაზიარება", cats:{wallets:"საფულეები და ჩანთები",perfume:"სუნამო და სილამაზე",accessories:"აქსესუარები",other:"სხვა"} }
 };
 const CATEGORIES = [{key:"wallets",emoji:"👛"},{key:"perfume",emoji:"🌸"},{key:"accessories",emoji:"🎀"},{key:"other",emoji:"🎁"}];
 
@@ -235,6 +241,7 @@ function renderCatalog() {
           <div class="product-name">${p.name?.[lang]||p.name?.ru||''}</div>
           <div class="product-desc">${p.desc?.[lang]||p.desc?.ru||''}</div>
           <div class="product-price">₾${p.price}</div>
+          <button class="share-btn" onclick="event.stopPropagation();shareProduct('${p.id}')">🔗 ${t('share')}</button>
           ${ctrl(p)}</div>`;
       grid.appendChild(card);
     });
@@ -248,7 +255,7 @@ function ctrl(p) {
   return `<div class="qty-control"><button class="qty-btn" onclick="changeQty('${p.id}',-1)">−</button><span class="qty-num">${qty}</span><button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button></div>`;
 }
 
-function updCard(id) { const p=products.find(x=>x.id===id),card=document.getElementById(`card-${id}`); if(!card||!p)return; card.querySelector('.product-body').innerHTML=`<div class="product-sku">${p.id}</div><div class="product-name">${p.name?.[lang]||p.name?.ru||''}</div><div class="product-desc">${p.desc?.[lang]||p.desc?.ru||''}</div><div class="product-price">₾${p.price}</div>${ctrl(p)}`; }
+function updCard(id) { const p=products.find(x=>x.id===id),card=document.getElementById(`card-${id}`); if(!card||!p)return; card.querySelector('.product-body').innerHTML=`<div class="product-sku">${p.id}</div><div class="product-name">${p.name?.[lang]||p.name?.ru||''}</div><div class="product-desc">${p.desc?.[lang]||p.desc?.ru||''}</div><div class="product-price">₾${p.price}</div><button class="share-btn" onclick="event.stopPropagation();shareProduct('${p.id}')">🔗 ${t('share')}</button>${ctrl(p)}`; }
 
 window.addToCart = id => { cart[id]=1; updCard(id); updateBar(); };
 window.changeQty = (id,d) => { cart[id]=(cart[id]||0)+d; if(cart[id]<=0)delete cart[id]; updCard(id); updateBar(); };
@@ -287,6 +294,37 @@ window.sendOrder = async () => {
 window.dismissSent = () => document.getElementById('orderSent').classList.remove('show');
 document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase() === lang));
 applyT();
+
+// ── SHARE ────────────────────────────────────────────
+window.shareProduct = id => {
+  const url = location.origin + location.pathname + '?item=' + encodeURIComponent(id);
+  navigator.clipboard.writeText(url).then(() => showToast(t('linkCopied')));
+};
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ── DEEP LINK ?item= ─────────────────────────────────
+const itemParam = new URLSearchParams(location.search).get('item');
+if (itemParam) {
+  const tryScroll = () => {
+    const card = document.getElementById('card-' + itemParam);
+    if (!card) return false;
+    card.scrollIntoView({ behavior:'smooth', block:'center' });
+    card.classList.add('highlight');
+    setTimeout(() => card.classList.remove('highlight'), 2000);
+    return true;
+  };
+  if (!tryScroll()) {
+    const obs = new MutationObserver(() => { if (tryScroll()) obs.disconnect(); });
+    obs.observe(document.getElementById('catalog'), { childList:true, subtree:true });
+    setTimeout(() => obs.disconnect(), 5000);
+  }
+}
 </script>
 </body>
 </html>
