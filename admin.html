@@ -191,7 +191,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, increment } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, increment, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -282,30 +282,80 @@ const CONFIRM_MSG = {
 };
 
 window.confirmOrder = async (firestoreId, items, orderLang, customerName) => {
-  await updateDoc(doc(db,"orders",firestoreId),{status:'confirmed'});
-  for (const item of items) {
-    const p = products.find(x=>x.id===item.id);
-    if (p) await updateDoc(doc(db,"products",p._id),{stock: increment(-(item.qty||1))});
+  try {
+    await runTransaction(db, async tx => {
+      // ── READ PHASE (all reads before any writes) ──────────────────────
+      const orderRef = doc(db, "orders", firestoreId);
+      const orderSnap = await tx.get(orderRef);
+      if (!orderSnap.exists()) throw new Error('Заказ не найден.');
+      const orderStatus = orderSnap.data().status;
+      if (orderStatus !== 'messenger_pending' && orderStatus !== 'pending') {
+        throw new Error('Заказ уже обработан — обновите страницу.');
+      }
+
+      const prodUpdates = [];
+      for (const item of items) {
+        const p = products.find(x => x.id === item.id);
+        if (!p) throw new Error(`Товар "${item.id}" не найден.`);
+        const prodRef = doc(db, "products", p._id);
+        const prodSnap = await tx.get(prodRef);
+        const data = prodSnap.data() || {};
+        const currentStock = data.stock !== undefined ? data.stock : (data.sold ? 0 : 99);
+        const needed = item.qty || 1;
+        if (currentStock < needed) {
+          throw new Error(`Недостаточно остатка: "${item.name}" — есть ${currentStock} шт., нужно ${needed}.`);
+        }
+        prodUpdates.push({ ref: prodRef, newStock: currentStock - needed });
+      }
+
+      // ── WRITE PHASE ───────────────────────────────────────────────────
+      tx.update(orderRef, { status: 'confirmed' });
+      for (const { ref, newStock } of prodUpdates) {
+        tx.update(ref, { stock: newStock });
+      }
+    });
+
+    // Transaction succeeded — open Messenger
+    const lang = orderLang && CONFIRM_MSG[orderLang] ? orderLang : 'ge';
+    const msg = CONFIRM_MSG[lang](customerName || '—');
+    window.open(`${MESSENGER_URL}?text=${encodeURIComponent(msg)}`, '_blank');
+  } catch (e) {
+    alert('⚠️ Не удалось подтвердить заказ:\n' + e.message);
   }
-  const lang = orderLang && CONFIRM_MSG[orderLang] ? orderLang : 'ge';
-  const name = customerName || '—';
-  const msg = CONFIRM_MSG[lang](name);
-  window.open(`${MESSENGER_URL}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 window.rejectOrder = async firestoreId => { await updateDoc(doc(db,"orders",firestoreId),{status:'rejected'}); };
 window.completeOrder = async firestoreId => { await updateDoc(doc(db,"orders",firestoreId),{status:'completed'}); };
 window.setStatusFilter = f => { statusFilter=f; renderOrders(); };
 window.undoOrder = async (firestoreId, status, items) => {
-  if (status==='confirmed') {
-    for (const item of items) {
-      const p = products.find(x=>x.id===item.id);
-      if (p) await updateDoc(doc(db,"products",p._id),{stock: increment(item.qty||1)});
+  try {
+    if (status === 'confirmed') {
+      // Restore stock atomically together with the status rollback
+      await runTransaction(db, async tx => {
+        // ── READ PHASE ────────────────────────────────────────────────
+        const orderRef = doc(db, "orders", firestoreId);
+        const stockReads = [];
+        for (const item of items) {
+          const p = products.find(x => x.id === item.id);
+          if (p) {
+            const prodRef = doc(db, "products", p._id);
+            const prodSnap = await tx.get(prodRef);
+            stockReads.push({ ref: prodRef, snap: prodSnap, qty: item.qty || 1 });
+          }
+        }
+        // ── WRITE PHASE ───────────────────────────────────────────────
+        tx.update(orderRef, { status: 'messenger_pending' });
+        for (const { ref, snap, qty } of stockReads) {
+          const current = snap.exists() ? (snap.data().stock ?? 0) : 0;
+          tx.update(ref, { stock: current + qty });
+        }
+      });
+    } else if (status === 'completed') {
+      await updateDoc(doc(db, "orders", firestoreId), { status: 'confirmed' });
+    } else {
+      await updateDoc(doc(db, "orders", firestoreId), { status: 'messenger_pending' });
     }
-    await updateDoc(doc(db,"orders",firestoreId),{status:'messenger_pending'});
-  } else if (status==='completed') {
-    await updateDoc(doc(db,"orders",firestoreId),{status:'confirmed'});
-  } else {
-    await updateDoc(doc(db,"orders",firestoreId),{status:'messenger_pending'});
+  } catch (e) {
+    alert('⚠️ Не удалось отменить:\n' + e.message);
   }
 };
 window.adjustStock = async (firestoreId, delta) => {
