@@ -210,6 +210,7 @@ let orders = [], products = [];
 let unsubOrders = null, unsubProducts = null;
 let statusFilter = '';
 const stockOf = p => p.stock !== undefined ? p.stock : (p.sold ? 0 : 99);
+const escapeHtml = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
 const loginOverlay = document.getElementById('loginOverlay');
 const logoutBtn = document.getElementById('logoutBtn');
@@ -338,20 +339,20 @@ function renderOrders() {
     return (b.createdAt?.toDate?.()?.getTime()||0)-(a.createdAt?.toDate?.()?.getTime()||0);
   });
   el.innerHTML = filterBar + sorted.map(o => {
-    const itemsHtml = (o.items||[]).map(i=>`<div class="order-item-row"><span class="order-item-sku">${i.id}</span><span class="order-item-name">${i.name}</span><span style="color:var(--muted);font-size:12px">×${i.qty}</span><span class="order-item-price">₾${i.price*i.qty}</span></div>`).join('');
+    const itemsHtml = (o.items||[]).map(i=>`<div class="order-item-row"><span class="order-item-sku">${escapeHtml(i.id)}</span><span class="order-item-name">${escapeHtml(i.name)}</span><span style="color:var(--muted);font-size:12px">×${i.qty}</span><span class="order-item-price">₾${i.price*i.qty}</span></div>`).join('');
     const itemsJson = encodeURIComponent(JSON.stringify(o.items||[]));
-    const safeName = (o.customerName||'').replace(/'/g,"\\'");
+    const encodedName = encodeURIComponent(o.customerName||'');
     let actions;
     if (o.status==='messenger_pending'||o.status==='pending') {
-      actions = `<button class="btn btn-accept" onclick="confirmOrder('${o._id}',JSON.parse(decodeURIComponent('${itemsJson}')),'${o.lang||''}','${safeName}')">✅ Принять</button><button class="btn btn-reject" onclick="rejectOrder('${o._id}')">❌ Отклонить</button>`;
+      actions = `<button class="btn btn-accept" onclick="confirmOrder('${o._id}',JSON.parse(decodeURIComponent('${itemsJson}')),'${o.lang||''}',decodeURIComponent('${encodedName}'))">✅ Принять</button><button class="btn btn-reject" onclick="rejectOrder('${o._id}')">❌ Отклонить</button>`;
     } else if (o.status==='confirmed') {
       actions = `<button class="btn btn-complete" onclick="completeOrder('${o._id}')">✔ Выполнен</button><button class="btn btn-undo" onclick="undoOrder('${o._id}','${o.status}',JSON.parse(decodeURIComponent('${itemsJson}')))">↩ Отменить</button>`;
     } else {
       actions = `<button class="btn btn-undo" onclick="undoOrder('${o._id}','${o.status}',JSON.parse(decodeURIComponent('${itemsJson}')))">↩ Отменить</button>`;
     }
-    const customerInfo = o.customerName ? `<div class="order-ts">${o.customerName}${o.customerPhone?' · '+o.customerPhone:''}</div>` : '';
+    const customerInfo = o.customerName ? `<div class="order-ts">${escapeHtml(o.customerName)}${o.customerPhone?' · '+escapeHtml(o.customerPhone):''}</div>` : '';
     return `<div class="order-card">
-      <div class="order-header"><div><div class="order-id">${o.orderId||o._id}</div><div class="order-ts">${fmtTime(o.createdAt)}</div>${customerInfo}</div><span class="status-badge status-${o.status}">${labels[o.status]||o.status}</span><div class="order-total">₾${o.total}</div></div>
+      <div class="order-header"><div><div class="order-id">${escapeHtml(o.orderId||o._id)}</div><div class="order-ts">${fmtTime(o.createdAt)}</div>${customerInfo}</div><span class="status-badge status-${o.status}">${labels[o.status]||o.status}</span><div class="order-total">₾${o.total}</div></div>
       <div class="order-items">${itemsHtml}</div>
       <div class="order-actions">${actions}</div>
     </div>`;
